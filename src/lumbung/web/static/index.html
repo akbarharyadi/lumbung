@@ -1,0 +1,2072 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1A1410">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/static/icon-192.png">
+<title>Lumbung</title>
+<style>
+/* ------------------------------------------------------------------ theme
+   Palette taken from a Toraja lumbung padi: dark ironwood posts, alang-alang
+   thatch, ochre and bone carving, husked rice. Warm on purpose -- this is a
+   granary you are filling over years, not a trading terminal.            */
+:root{
+  --wood-0:#140F0B; --wood-1:#1E1712; --wood-2:#2A211A; --wood-3:#3A2E24;
+  --thatch:#D9A441; --thatch-dim:#8A6B2E;
+  --ochre:#B85A3C; --bone:#F2E9D8; --husk:#A8937A;
+  --leaf:#7FB069; --clay:#C4553D;
+  --r:16px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{overscroll-behavior-y:contain}
+body{
+  margin:0;background:var(--wood-0);color:var(--bone);
+  font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  padding-bottom:calc(78px + env(safe-area-inset-bottom));
+}
+/* header */
+header{
+  position:sticky;top:0;z-index:20;background:rgba(20,15,11,.94);
+  backdrop-filter:blur(14px);border-bottom:1px solid var(--wood-3);
+  padding:calc(12px + env(safe-area-inset-top)) 18px 12px;
+  display:flex;align-items:center;gap:11px;
+}
+header svg.mark{width:26px;height:26px;flex:0 0 auto}
+header h1{font-size:17px;margin:0;font-weight:650;letter-spacing:.3px}
+.chip{
+  font-size:10.5px;font-weight:700;padding:4px 9px;border-radius:99px;
+  background:var(--wood-3);color:var(--husk);letter-spacing:.5px;
+}
+.chip.live{background:#3A2018;color:#FF9A7A}
+.chip.paper{background:#23301F;color:var(--leaf)}
+.chip.halt{background:#3A1A18;color:#FF8A7A}
+main{padding:16px;max-width:620px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.pane{display:none;flex-direction:column;gap:14px}
+.pane.on{display:flex;animation:fade .22s ease}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* cards */
+.card{background:var(--wood-1);border:1px solid var(--wood-3);border-radius:var(--r);padding:18px}
+.card.flush{padding:0;overflow:hidden}
+.eyebrow{
+  font-size:10.5px;color:var(--husk);text-transform:uppercase;
+  letter-spacing:1.1px;font-weight:700;margin-bottom:8px;
+}
+.hero{font-size:34px;font-weight:700;letter-spacing:-1px;line-height:1.1}
+.hero.sm{font-size:26px}
+.note{font-size:13px;color:var(--husk);margin-top:6px}
+.up{color:var(--leaf)} .down{color:var(--clay)} .gold{color:var(--thatch)}
+
+/* the granary: fills as you approach the goal */
+.barn{padding:20px 18px 14px;text-align:center}
+.barn svg{width:170px;height:150px}
+.barn .cap{font-size:12.5px;color:var(--husk);margin-top:2px}
+.barn .pctline{font-size:15px;font-weight:650;margin-top:10px}
+
+/* rows */
+.row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px 0}
+.row+.row{border-top:1px solid var(--wood-2)}
+.row .l{min-width:0}
+.row .r{text-align:right;flex:0 0 auto}
+.name{font-weight:600;font-size:15px}
+.sub{font-size:12.5px;color:var(--husk);margin-top:3px}
+
+/* allocation */
+.alloc{display:flex;flex-direction:column;gap:14px}
+.alloc .hd{display:flex;justify-content:space-between;font-size:13.5px;margin-bottom:7px}
+.trk{position:relative;height:10px;border-radius:99px;background:var(--wood-3);overflow:visible}
+.trk>i{display:block;height:100%;border-radius:99px;transition:width .5s ease}
+.trk .goal{
+  position:absolute;top:-4px;width:2px;height:18px;background:var(--bone);
+  opacity:.6;border-radius:2px;
+}
+/* stats grid */
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.tile{background:var(--wood-2);border:1px solid var(--wood-3);border-radius:12px;padding:13px}
+.tile .v{font-size:19px;font-weight:650;margin-top:3px}
+.tile .k{font-size:10.5px;color:var(--husk);text-transform:uppercase;letter-spacing:.9px;font-weight:700}
+
+/* pills / tags */
+.tag{font-size:10px;font-weight:700;padding:3px 8px;border-radius:7px;letter-spacing:.4px}
+.tag.HOLD{background:#23301F;color:var(--leaf)}
+.tag.WATCH{background:#33291A;color:var(--thatch)}
+.tag.TRIM{background:#33291A;color:var(--thatch)}
+.tag.ACTION{background:#3A1A18;color:#FF8A7A}
+
+/* banner */
+.banner{
+  border-radius:12px;padding:13px 15px;font-size:13.5px;line-height:1.45;
+  border:1px solid;display:flex;gap:10px;align-items:flex-start;
+}
+.banner.warn{background:#2E2312;border-color:#5A451E;color:#F0D9A8}
+.banner.bad{background:#2E1614;border-color:#5A2721;color:#FFC2B2}
+.banner b{display:block;margin-bottom:2px}
+
+/* sparkline */
+.spark{width:100%;height:64px;display:block;margin-top:10px}
+
+/* events */
+.ev{display:flex;gap:11px;padding:10px 0;font-size:12.5px;border-top:1px solid var(--wood-2)}
+.ev time{color:var(--thatch-dim);flex:0 0 auto;font-variant-numeric:tabular-nums}
+.ev span{color:var(--husk)}
+
+/* bottom nav */
+nav{
+  position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;
+  background:rgba(20,15,11,.97);backdrop-filter:blur(14px);
+  border-top:1px solid var(--wood-3);
+  padding:8px 6px calc(8px + env(safe-area-inset-bottom));
+}
+nav button{
+  flex:1;background:none;border:0;color:var(--husk);font-family:inherit;
+  font-size:10.5px;font-weight:700;letter-spacing:.4px;padding:7px 2px;
+  display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;
+  border-radius:11px;
+}
+nav button svg{width:21px;height:21px;stroke-width:1.9}
+nav button.on{color:var(--thatch)}
+nav button:active{background:var(--wood-2)}
+
+/* action buttons */
+.acts{display:flex;gap:10px}
+.acts button{
+  flex:1;padding:14px;border-radius:12px;border:1px solid var(--wood-3);
+  background:var(--wood-2);color:var(--bone);font:inherit;font-weight:650;
+  font-size:14px;cursor:pointer;
+}
+.acts button:active{transform:scale(.98)}
+.acts button.go{background:#1E2C1B;border-color:#33502C;color:var(--leaf)}
+.acts button.bad{background:#2E1614;border-color:#5A2721;color:#FF8A7A}
+
+/* login */
+#login{padding:70px 26px;max-width:400px;margin:0 auto;text-align:center}
+#login>svg{width:80px;height:72px;margin-bottom:18px}
+#login h2{margin:0 0 6px;font-size:22px}
+input{
+  width:100%;padding:14px;border-radius:12px;border:1px solid var(--wood-3);
+  background:var(--wood-2);color:var(--bone);font:inherit;font-size:15px;margin:16px 0;
+}
+.err{color:var(--clay);font-size:13px;margin-top:10px}
+.tiny{font-size:12px;color:var(--husk)}
+
+/* ---------------------------------------------------- checklist + settings */
+.act{display:flex;gap:12px;align-items:flex-start;padding:14px 0}
+.act+.act{border-top:1px solid var(--wood-2)}
+.at{font-weight:600;line-height:1.35}
+.ad{color:var(--husk);font-size:13px;line-height:1.5;margin-top:4px}
+.pill{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.06em;
+      text-transform:uppercase;padding:3px 8px;border-radius:999px;margin-left:8px;
+      vertical-align:1px}
+.pill.urgent{background:rgba(196,85,61,.18);color:var(--clay)}
+.pill.soon{background:rgba(217,164,65,.16);color:var(--thatch)}
+.pill.idea{background:var(--wood-2);color:var(--husk)}
+.hint{font-size:12px;color:var(--thatch-dim);margin-top:6px}
+
+.fld{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 0}
+.fld+.fld{border-top:1px solid var(--wood-2)}
+.fld label{color:var(--husk);font-size:14px;flex:1;min-width:0}
+.fld input{width:150px;flex:0 0 auto;background:var(--wood-0);border:1px solid var(--wood-3);
+           color:var(--bone);border-radius:9px;padding:9px 11px;font:inherit;font-size:14px;
+           text-align:right}
+.fld input:focus{outline:none;border-color:var(--thatch-dim)}
+.fld input.pw{text-align:left;font-family:ui-monospace,monospace;font-size:12px}
+.set{background:var(--leaf);color:var(--wood-0);border-radius:999px;font-size:10px;
+     font-weight:700;padding:3px 8px}
+.unset{background:var(--wood-2);color:var(--husk);border-radius:999px;font-size:10px;
+       font-weight:700;padding:3px 8px}
+.gear{background:none;border:0;color:var(--husk);cursor:pointer;padding:6px;line-height:0}
+.gear:hover{color:var(--thatch)}
+.gear svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8}
+/* `.note` is already taken by the small grey captions; this is the boxed one. */
+.callout{background:rgba(217,164,65,.08);border:1px solid var(--thatch-dim);
+      border-radius:12px;padding:12px 14px;color:var(--thatch);font-size:13px;line-height:1.55}
+.msg{font-size:13px;margin-top:12px;min-height:18px}
+.msg.ok{color:var(--leaf)} .msg.bad{color:var(--clay)}
+
+/* ------------------------------------------------- pull to refresh */
+/* In standalone PWA mode there is no address bar, so the browser's own
+   reload is unreachable. Without this there is literally no way to force
+   fresh data, and the 60s auto-refresh is invisible -- you cannot tell
+   "nothing changed" from "nothing loaded". */
+#ptr{position:fixed;top:0;left:0;right:0;height:0;display:grid;place-items:center;
+     overflow:hidden;z-index:60;pointer-events:none;
+     background:linear-gradient(180deg,var(--wood-1),transparent)}
+#ptr .ring{width:26px;height:26px;border-radius:50%;
+     border:2.5px solid var(--wood-3);border-top-color:var(--thatch);
+     transform:rotate(0deg)}
+#ptr.spin .ring{animation:ptrspin .8s linear infinite}
+@keyframes ptrspin{to{transform:rotate(360deg)}}
+#chipTime{cursor:pointer}
+#chipTime.stale{color:var(--clay)}
+
+/* Sits at the bottom on purpose. The install prompt already taught us that a
+   bar pinned to the top covers the gear and makes Settings unreachable. */
+#updateBar{position:fixed;left:12px;right:12px;bottom:12px;z-index:60;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:12px 14px;border-radius:14px;background:var(--wood-3);
+  color:var(--bone);border:1px solid var(--wood-2);
+  box-shadow:0 6px 24px rgba(0,0,0,.35)}
+#updateBar[hidden]{display:none}
+#updateBar button{background:var(--husk);color:var(--wood-3);border:0;
+  border-radius:10px;padding:8px 14px;font-weight:600}
+
+/* --------------------------------------------------- install prompt */
+/* Top, not bottom -- the bottom-right corner belongs to the chat bubble.
+   But BELOW the header, not over it: fixed at top:12px it covered the gear,
+   so the settings screen became unreachable while the banner was showing. It
+   sits in the flow instead, pushing content down, which cannot cover anything. */
+#install{position:sticky;top:0;margin:10px 14px 0;
+  z-index:19;background:var(--wood-1);border:1px solid var(--thatch-dim);
+  border-radius:var(--r);padding:14px 16px;display:none;gap:12px;align-items:center;
+  box-shadow:0 10px 30px rgba(0,0,0,.5)}
+#install.on{display:flex}
+#install svg{width:34px;height:30px;flex:0 0 auto}
+#install .t{flex:1;min-width:0}
+#install .t b{display:block;font-size:14.5px}
+#install .t span{display:block;font-size:12.5px;color:var(--husk);line-height:1.45;margin-top:2px}
+#install button{flex:0 0 auto;border:0;border-radius:10px;padding:9px 14px;
+  font:inherit;font-size:13px;font-weight:600;cursor:pointer;
+  background:var(--thatch);color:var(--wood-0)}
+#install button.ghost{background:none;color:var(--husk);padding:9px 6px;font-weight:400}
+
+/* ------------------------------------------------------ settings groups */
+.grp{font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+     color:var(--thatch-dim);font-weight:700;margin:18px 0 2px}
+.grp:first-child{margin-top:2px}
+.grph{font-size:12.5px;color:var(--husk);line-height:1.5;margin-bottom:6px}
+
+/* --------------------------------------------------------------- chat */
+/* A floating sheet rather than a tab. Chat is something you reach for while
+   looking at a number, so taking over the whole screen -- and a nav slot --
+   was the wrong shape for it. */
+#chatFab{position:fixed;right:16px;bottom:calc(var(--navh,72px) + 16px);z-index:75;
+  width:52px;height:52px;border-radius:50%;border:0;cursor:pointer;
+  background:var(--thatch);color:var(--wood-0);display:grid;place-items:center;
+  box-shadow:0 8px 24px rgba(0,0,0,.45);transition:transform .15s}
+#chatFab:active{transform:scale(.94)}
+#chatFab svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:2;
+  stroke-linecap:round;stroke-linejoin:round}
+#chatFab.hide{display:none}
+
+#chatSheet{position:fixed;inset:0;z-index:80;display:none;
+  background:var(--wood-0);overscroll-behavior:contain}
+/* While the sheet is open the page behind must not scroll at all. Without
+   this a phone shows two scrollbars and the wrong one moves under your
+   thumb. */
+body.chatopen{overflow:hidden;position:fixed;width:100%}
+#chatSheet.on{display:block}
+/* Full height on a phone. An 8vh gap left the page visible behind the sheet,
+   and a visible page is a scrollable page -- which is where the second
+   scrollbar came from. */
+#chatSheet .panel{position:absolute;left:0;right:0;bottom:0;top:0;
+  background:var(--wood-0);border-top-left-radius:20px;border-top-right-radius:20px;
+  border-top:1px solid var(--wood-3);display:flex;flex-direction:column;
+  animation:sheetup .22s ease-out}
+@keyframes sheetup{from{transform:translateY(14px);opacity:.6}to{transform:none;opacity:1}}
+@media (max-width:520px){
+  /* Narrow screens: the bar takes the full width and the bubble moves up out
+     of its way, rather than the two fighting over one corner. */
+  #setBar{right:12px}
+  body.settings-dirty #chatFab{bottom:calc(var(--navh,72px) + 84px)}
+}
+@media (min-width:700px){
+  #chatSheet{background:rgba(10,7,5,.55);backdrop-filter:blur(2px)}
+  #chatSheet .panel{top:6vh;left:50%;right:auto;width:min(680px,94vw);
+    transform:translateX(-50%);border-radius:20px 20px 0 0}
+}
+#chatSheet header{display:flex;align-items:center;gap:10px;padding:14px 16px 10px;
+  border-bottom:1px solid var(--wood-2);position:static;background:none}
+#chatSheet header b{flex:1;font-size:15px}
+#chatSheet header button{background:none;border:0;color:var(--husk);cursor:pointer;
+  padding:6px 8px;font:inherit;font-size:13px;border-radius:8px}
+#chatSheet header button:hover{color:var(--thatch);background:var(--wood-1)}
+
+#chatLog{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px;
+  padding:14px 16px}
+.bub{max-width:84%;padding:10px 13px;border-radius:14px;font-size:14px;
+  line-height:1.55;white-space:pre-wrap;word-break:break-word}
+.bub.you{align-self:flex-end;background:var(--wood-3);color:var(--bone);
+  border-bottom-right-radius:4px}
+.bub.lum{align-self:flex-start;background:var(--wood-1);border:1px solid var(--wood-2);
+  color:var(--bone);border-bottom-left-radius:4px}
+/* Markdown: GLM's answers arrive as markdown -- headers, lists, code.
+   The renderer escapes first and only emits its own tags, so model
+   output stays data, never markup. */
+.bub.md{white-space:normal}
+.bub.md p{margin:0 0 7px}
+.bub.md p:last-child{margin-bottom:0}
+.bub.md h3,.bub.md h4,.bub.md h5,.bub.md h6{margin:9px 0 4px;font-size:14px;line-height:1.4}
+.bub.md h3:first-child,.bub.md h4:first-child{margin-top:0}
+.bub.md ul,.bub.md ol{margin:4px 0 7px;padding-left:19px}
+.bub.md li{margin:2px 0}
+.bub.md li:last-child{margin-bottom:0}
+.bub.md code{background:var(--wood-2);border-radius:5px;padding:1px 5px;font-size:12.5px}
+.bub.md pre{background:var(--wood-2);border-radius:8px;padding:8px 10px;overflow-x:auto;margin:6px 0}
+.bub.md pre code{background:none;padding:0;font-size:12px}
+.bub.md blockquote{border-left:3px solid var(--wood-3);margin:4px 0;padding:1px 0 1px 10px;color:var(--husk)}
+.bub.md hr{border:0;border-top:1px solid var(--wood-2);margin:8px 0}
+.bub.md a{color:var(--clay)}
+.bub.md .tbl{overflow-x:auto;margin:6px 0}
+.bub.md table{border-collapse:collapse;font-size:12.5px;min-width:100%}
+.bub.md th,.bub.md td{border:1px solid var(--wood-2);padding:4px 8px;text-align:left}
+.bub.md th{background:var(--wood-2);font-weight:700;white-space:nowrap}
+
+
+/* Thinking: three dots and a way out. A spinner with no stop button is a
+   promise you cannot keep -- answers here can take a while, and being stuck
+   watching one is worse than being told it is still going. */
+.think{align-self:flex-start;display:flex;align-items:center;gap:10px;
+  background:var(--wood-1);border:1px solid var(--wood-2);border-radius:14px;
+  border-bottom-left-radius:4px;padding:11px 13px}
+.think .dots{display:flex;gap:4px}
+.think .dots i{width:6px;height:6px;border-radius:50%;background:var(--husk);
+  animation:blink 1.3s infinite}
+.think .dots i:nth-child(2){animation-delay:.18s}
+.think .dots i:nth-child(3){animation-delay:.36s}
+@keyframes blink{0%,60%,100%{opacity:.25}30%{opacity:1}}
+.think span{font-size:13px;color:var(--husk)}
+.think button{background:none;border:1px solid var(--wood-3);color:var(--husk);
+  border-radius:8px;padding:4px 9px;font:inherit;font-size:12px;cursor:pointer}
+.think button:hover{color:var(--clay);border-color:var(--clay)}
+
+.chiprow{display:flex;gap:6px;overflow-x:auto;padding:8px 16px 2px;
+  scrollbar-width:none}
+.chiprow::-webkit-scrollbar{display:none}
+.chiprow button{flex:0 0 auto;background:var(--wood-2);border:1px solid var(--wood-3);
+  color:var(--husk);border-radius:999px;padding:6px 12px;font:inherit;font-size:12.5px;
+  cursor:pointer;white-space:nowrap}
+.chiprow button:hover{color:var(--thatch);border-color:var(--thatch-dim)}
+
+.chatbar{display:flex;gap:8px;align-items:flex-end;padding:10px 16px 16px;
+  border-top:1px solid var(--wood-2)}
+.chatbar textarea{flex:1;resize:none;min-height:42px;max-height:120px;
+  background:var(--wood-1);border:1px solid var(--wood-3);color:var(--bone);
+  border-radius:12px;padding:11px 13px;font:inherit;font-size:14px}
+.chatbar textarea:focus{outline:none;border-color:var(--thatch-dim)}
+.chatbar button{flex:0 0 auto;border:0;border-radius:12px;width:42px;height:42px;
+  display:grid;place-items:center;cursor:pointer;background:var(--thatch);
+  color:var(--wood-0)}
+.chatbar button.attach{background:var(--wood-2);color:var(--husk)}
+.pendrow{display:flex;flex-wrap:wrap;gap:6px;padding:0 10px 8px}
+.pendrow:empty{display:none}
+.pend{display:flex;align-items:center;gap:6px;max-width:100%;
+  background:var(--wood-2);color:var(--husk);border-radius:10px;
+  padding:5px 8px;font-size:12px;line-height:1.2}
+.pend span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px}
+.pend b{font-weight:600;opacity:.6;font-size:11px}
+.pend button{all:unset;cursor:pointer;opacity:.65;padding:0 2px;font-size:14px}
+.pend button:hover{opacity:1}
+.chatbar svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:2;
+  stroke-linecap:round;stroke-linejoin:round}
+
+/* ------------------------------------------------------- settings screen */
+.setcard{background:var(--wood-1);border:1px solid var(--wood-3);
+  border-radius:var(--r);padding:16px 18px;margin-bottom:14px}
+.setcard h3{margin:0 0 2px;font-size:15px;font-weight:600}
+.setcard .why{font-size:12.5px;color:var(--husk);line-height:1.5;margin-bottom:6px}
+
+/* Money rows: the value is the point, so it gets the weight and the label
+   steps back. A rupiah prefix inside the box removes the guesswork about
+   whether a figure is thousands or millions. */
+.mrow{display:flex;align-items:center;gap:12px;padding:11px 0}
+.mrow+.mrow{border-top:1px solid var(--wood-2)}
+.mrow label{flex:1;min-width:0;font-size:13.5px;color:var(--husk);line-height:1.35}
+.mrow .box{flex:0 0 auto;display:flex;align-items:center;gap:6px;
+  background:var(--wood-0);border:1px solid var(--wood-3);border-radius:10px;
+  padding:8px 11px}
+.mrow .box:focus-within{border-color:var(--thatch-dim)}
+.mrow .box span{font-size:12px;color:var(--husk)}
+.mrow input{width:112px;background:none;border:0;color:var(--bone);font:inherit;
+  font-size:14.5px;font-weight:600;text-align:right;padding:0}
+.mrow input:focus{outline:none}
+.mrow input.pw{width:150px;text-align:left;font-family:ui-monospace,monospace;
+  font-size:12px;font-weight:400}
+
+/* Allocation: a slider and a bar, because a percentage means nothing until you
+   see it next to where you actually are. */
+.arow{padding:12px 0}
+.arow+.arow{border-top:1px solid var(--wood-2)}
+.ahead{display:flex;align-items:baseline;gap:8px;margin-bottom:7px}
+.ahead b{flex:1;font-size:13.5px;font-weight:600;text-transform:capitalize}
+.ahead .now{font-size:12px;color:var(--husk)}
+.ahead .tgt{font-size:14px;font-weight:700;color:var(--thatch);min-width:44px;
+  text-align:right}
+.abar{position:relative;height:6px;border-radius:3px;background:var(--wood-2);
+  margin-bottom:9px}
+.abar i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;
+  background:var(--husk);opacity:.55}
+.abar u{position:absolute;top:-3px;width:2px;height:12px;background:var(--thatch);
+  border-radius:1px}
+.arow input[type=range]{width:100%;accent-color:var(--thatch);height:18px;margin:0}
+
+.alloctot{display:flex;align-items:center;gap:10px;margin-top:14px;
+  padding-top:12px;border-top:1px solid var(--wood-2)}
+.alloctot span{flex:1;font-size:13px;color:var(--husk)}
+.alloctot b{font-size:17px;font-weight:700}
+.alloctot b.ok{color:var(--leaf)} .alloctot b.over{color:var(--clay)}
+.alloctot b.under{color:var(--thatch)}
+
+/* Save bar: appears only when something changed, and says how much. A button
+   that is always there tells you nothing about whether you have edits. */
+/* Right edge stops short of the chat bubble: the Save button and the bubble
+   were sharing the same corner, and the one you hit was whichever drew last. */
+#setBar{position:fixed;left:12px;right:80px;bottom:calc(var(--navh,72px) + 12px);
+  z-index:65;background:var(--wood-1);border:1px solid var(--thatch-dim);
+  border-radius:14px;padding:11px 14px;display:none;align-items:center;gap:12px;
+  box-shadow:0 10px 28px rgba(0,0,0,.5)}
+#setBar.on{display:flex}
+#setBar span{flex:1;font-size:13px;color:var(--husk)}
+#setBar button{border:0;border-radius:10px;padding:9px 15px;font:inherit;
+  font-size:13px;font-weight:600;cursor:pointer;background:var(--thatch);
+  color:var(--wood-0)}
+#setBar button.ghost{background:none;color:var(--husk);font-weight:400;padding:9px 8px}
+.keystate{font-size:11px;font-weight:700;border-radius:999px;padding:3px 8px}
+.keystate.yes{background:rgba(127,176,105,.16);color:var(--leaf)}
+.keystate.no{background:var(--wood-2);color:var(--husk)}
+</style>
+</head>
+<body>
+
+<!-- ------------------------------------------------------------- login -->
+<div id="login" hidden>
+  <svg viewBox="0 0 200 165" fill="none" aria-hidden="true">
+    <use href="#lumbung-art"/>
+  </svg>
+  <h2>Lumbung</h2>
+  <p class="tiny">Paste your dashboard token.<br>
+     It is <code>DASHBOARD_TOKEN</code> in <code>.env</code>, and it is printed
+     when the dashboard starts. You only do this once per device.</p>
+  <input id="tok" type="password" placeholder="dashboard token" autocomplete="current-password">
+  <div class="acts"><button class="go" onclick="saveToken()">Connect</button></div>
+  <div class="err" id="loginErr"></div>
+</div>
+
+<!-- reusable lumbung drawing: saddle roof, upswept eaves, raised posts -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <!-- Draw order matters: posts, then body, then the roof LAST so the
+         thatch caps the barn. Roof-first makes the body float in front of
+         it and the whole thing reads as a pair of horns. -->
+    <g id="lumbung-art">
+      <rect x="68" y="124" width="8" height="26" rx="2" fill="#2A211A"/>
+      <rect x="88" y="124" width="8" height="26" rx="2" fill="#2A211A"/>
+      <rect x="104" y="124" width="8" height="26" rx="2" fill="#2A211A"/>
+      <rect x="124" y="124" width="8" height="26" rx="2" fill="#2A211A"/>
+      <rect x="52" y="150" width="96" height="4" rx="2" fill="#2A211A"/>
+      <path d="M54,66 L146,66 L139,124 L61,124 Z" fill="#4A3A2C" stroke="#5A4735" stroke-width="2"/>
+      <path d="M8,18 Q100,64 192,18 L166,50 Q100,82 34,50 Z" fill="#D9A441"/>
+      <path d="M17,26 Q100,72 183,26 L166,50 Q100,82 34,50 Z" fill="#B07E2E"/>
+    </g>
+  </defs>
+</svg>
+
+<!-- --------------------------------------------------------------- app -->
+<div id="app" hidden>
+<header>
+  <svg class="mark" viewBox="0 0 200 165"><use href="#lumbung-art"/></svg>
+  <h1>Lumbung</h1>
+  <span class="chip" id="chipMode">…</span>
+  <span style="flex:1"></span>
+  <span class="chip" id="chipTime"></span>
+  <button class="gear" onclick="tab('settings')" title="Settings" aria-label="Settings">
+    <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3.2"/>
+      <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.56V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 8.9 19.3a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.51-1.1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34H9a1.7 1.7 0 0 0 1-1.56V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V9a1.7 1.7 0 0 0 1.56 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1z"/>
+    </svg>
+  </button>
+</header>
+
+<div id="ptr"><div class="ring"></div></div>
+
+
+
+<main>
+<div id="install">
+  <svg viewBox="0 0 200 165" fill="none" aria-hidden="true"><use href="#lumbung-art"/></svg>
+  <div class="t">
+    <b>Install Lumbung</b>
+    <span id="installWhy">Add it to your home screen — opens like an app, no address bar.</span>
+  </div>
+  <button class="ghost" onclick="dismissInstall()">Not now</button>
+  <button id="installGo" onclick="doInstall()">Install</button>
+</div>
+
+  <!-- ============================================ HOME -->
+  <section class="pane on" id="p-home">
+    <div id="alerts"></div>
+
+    <div class="card" id="doCard" style="margin-bottom:14px">
+      <div class="eyebrow">
+        What to do next
+        <span id="doBadge" class="pill urgent" style="display:none">0</span>
+      </div>
+      <div id="actSummary" class="note" style="margin-top:0">…</div>
+      <div id="actList"></div>
+      <div class="ad" style="margin-top:10px;opacity:.75">
+        Every item is worked out from your live numbers, so acting on one makes
+        it disappear by itself. Nothing to tick off.
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="eyebrow">Net worth</div>
+      <div class="hero" id="nw">—</div>
+      <div class="note" id="nwNote"></div>
+    </div>
+
+    <div class="card flush barn">
+      <div class="eyebrow" style="margin:0 0 4px">Filling the granary</div>
+      <svg viewBox="0 0 200 165" id="barnSvg"></svg>
+      <div class="pctline" id="barnPct">—</div>
+      <div class="cap" id="barnCap"></div>
+    </div>
+
+    <div class="card">
+      <div class="grid">
+        <div class="tile"><div class="k" id="kSaving">Saving</div><div class="v up" id="tSurplus">—</div></div>
+        <div class="tile"><div class="k">Of income</div><div class="v" id="tRate">—</div></div>
+        <div class="tile"><div class="k">Passive income</div><div class="v gold" id="tDiv">—</div></div>
+        <div class="tile"><div class="k">Safety net</div><div class="v" id="tEf">—</div></div>
+      </div>
+      <div class="note" id="flowNote"></div>
+    </div>
+
+    <div class="card">
+      <div class="eyebrow">Spending</div>
+      <div id="spendBox"></div>
+    </div>
+  </section>
+
+  <!-- ============================================ PORTFOLIO -->
+  <section class="pane" id="p-folio">
+    <div class="card">
+      <div class="eyebrow">What you own</div>
+      <div class="alloc" id="alloc"></div>
+      <div class="note">The pale line marks the share you are aiming for.</div>
+    </div>
+    <div class="card">
+      <div class="eyebrow">Stocks</div>
+      <div id="holds"></div>
+    </div>
+
+    <div class="card">
+      <div class="eyebrow">Savings, bonds and gold</div>
+      <div id="assets"></div>
+    </div>
+
+    <div class="card">
+      <div class="eyebrow">Also owned</div>
+      <div id="possessions"></div>
+    </div>
+  </section>
+
+  <!-- ============================================ BOT -->
+  <section class="pane" id="p-bot">
+    <div class="card">
+      <div class="eyebrow">Crypto bot</div>
+      <div class="hero sm" id="botEq">—</div>
+      <div class="note" id="botNote"></div>
+      <svg class="spark" id="spark" viewBox="0 0 300 64" preserveAspectRatio="none"></svg>
+    </div>
+    <div class="card" id="posCard">
+      <div class="eyebrow">Open positions</div>
+      <div id="positions"></div>
+    </div>
+    <div class="acts">
+      <button id="bPause" onclick="ctl('pause')">Pause</button>
+      <button onclick="ctl('flat')">Sell all</button>
+      <button class="bad" onclick="ctl('kill')">Stop</button>
+    </div>
+    <div class="card">
+      <div class="eyebrow">Recent activity</div>
+      <div id="events"></div>
+    </div>
+  </section>
+
+  <!-- ============================================ PLAN -->
+  <section class="pane" id="p-plan">
+    <div class="card">
+      <div class="eyebrow">Next month's saving</div>
+      <div id="splan"></div>
+      <div class="note">
+        Sent to whatever is furthest below target — this rebalances by buying,
+        so nothing has to be sold.
+      </div>
+    </div>
+    <div class="card">
+      <div class="eyebrow">Safety net</div>
+      <div id="efDetail"></div>
+    </div>
+    <div class="card">
+      <div class="eyebrow">Considering</div>
+      <div id="wishDetail"></div>
+    </div>
+    <div class="card">
+      <div class="eyebrow">The goal</div>
+      <div id="goalDetail"></div>
+    </div>
+
+    <div class="card">
+      <div class="eyebrow">Next month: what to cut</div>
+      <div id="cutPlan"></div>
+      <div class="note" id="cutNote"></div>
+    </div>
+    <div class="card">
+      <div class="eyebrow">Where the money went</div>
+      <div id="expSummary"></div>
+      <div id="expCats" style="margin-top:6px"></div>
+      <div id="expList" style="margin-top:6px"></div>
+    </div>
+  </section>
+
+  <!-- ============================================ SETTINGS -->
+  <section class="pane" id="p-settings">
+    <div id="setGroups"></div>
+
+    <div class="setcard">
+      <h3>Keys &amp; access</h3>
+      <div class="why">
+        Values go in, nothing comes back out — this screen can never show you a
+        key it already holds. Give the Indodax key <b>view + trade only</b>.
+        Never enable withdraw: if the key leaks, that is what keeps your coins
+        on the exchange.
+      </div>
+      <div id="setSecrets"></div>
+      <button class="btn" style="margin-top:14px;width:100%" onclick="saveSecrets()">Save keys</button>
+      <div class="msg" id="secMsg"></div>
+      <div class="ad" style="margin-top:8px">
+        Key changes take effect when the engine restarts.
+      </div>
+    </div>
+
+    <div class="setcard">
+      <h3>Session</h3>
+      <div class="why" id="sessWho">…</div>
+      <div class="acts" style="margin-top:12px">
+        <button class="bad" onclick="signOut()">Sign out</button>
+      </div>
+      <div class="ad" style="margin-top:10px">
+        Clears the Cloudflare login, so the next visit starts from scratch.
+        Cloudflare holds the session, not this app, so signing out here signs
+        you out on every device — what you want if you have lost your phone.
+      </div>
+      <div class="msg" id="sessMsg"></div>
+    </div>
+  </section>
+
+</main>
+
+<div id="updateBar" hidden>
+  <span>Lumbung has been updated.</span>
+  <button onclick="location.reload()">Reload</button>
+</div>
+<button id="chatFab" onclick="openChat()" aria-label="Ask Lumbung">
+  <svg viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.3-.6L3 21l1.8-5A8.3 8.3 0 0 1 12 3.5a8.4 8.4 0 0 1 9 8z"/></svg>
+</button>
+
+<div id="setBar">
+  <span id="setBarWhat">1 change</span>
+  <button class="ghost" onclick="loadSettings(true)">Discard</button>
+  <button onclick="saveSettings()">Save</button>
+</div>
+
+<div id="chatSheet" onclick="if(event.target===this) closeChat()">
+  <div class="panel">
+    <header>
+      <b>Ask Lumbung</b>
+      <button onclick="resetChat()">Reset</button>
+      <button onclick="closeChat()">Close</button>
+    </header>
+    <div id="chatLog"></div>
+    <div class="chiprow">
+      <button onclick="chatQuick('/todo')">What to do</button>
+      <button onclick="chatQuick('/networth')">Net worth</button>
+      <button onclick="chatQuick('/expenses')">Spending</button>
+      <button onclick="chatQuick('/payday')">Payday plan</button>
+      <button onclick="chatQuick('/help')">Help</button>
+    </div>
+    <div class="pendrow" id="pendRow"></div>
+    <div class="chatbar">
+      <input type="file" id="chatFile" accept="image/*,.pdf" multiple hidden
+             onchange="chatStage(this)">
+      <button class="attach" onclick="document.getElementById('chatFile').click()"
+              title="Send a receipt or screenshot">
+        <svg viewBox="0 0 24 24"><path d="M21 12.5V7a4 4 0 0 0-8 0v10a2.5 2.5 0 0 0 5 0V8"/></svg>
+      </button>
+      <textarea id="chatIn" rows="1" placeholder="Ask anything, or /help"
+                onkeydown="chatKey(event)"></textarea>
+      <button onclick="chatSend()" title="Send">
+        <svg viewBox="0 0 24 24"><path d="M4 12h15"/><path d="M13 6l6 6-6 6"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+
+<nav>
+  <button class="on" data-p="home" onclick="tab('home')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 4l9 6.5"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/></svg>
+    Home
+  </button>
+  <button data-p="folio" onclick="tab('folio')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v8.5l6 4.2"/></svg>
+    Portfolio
+  </button>
+  <button data-p="bot" onclick="tab('bot')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 16l5-6 4 3.5L21 5"/><path d="M16 5h5v5"/></svg>
+    Bot
+  </button>
+  <button data-p="plan" onclick="tab('plan')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5h16"/><path d="M4 12h16"/><path d="M4 18.5h10"/></svg>
+    Plan
+  </button>
+</nav>
+</div>
+
+<script>
+/* ------------------------------------------------------------ helpers */
+const rp  = n => 'Rp ' + Math.round(n).toLocaleString('en-US');
+const rpS = n => {                       // Indonesian short scale: jt / M
+  const a = Math.abs(n);
+  if (a >= 1e9) return 'Rp ' + (n/1e9).toFixed(2).replace(/\.?0+$/,'') + ' M';
+  if (a >= 1e6) return 'Rp ' + (n/1e6).toFixed(1).replace(/\.0$/,'') + ' jt';
+  if (a >= 1e3) return 'Rp ' + Math.round(n/1e3) + ' rb';
+  return 'Rp ' + Math.round(n);
+};
+const pc  = n => (n>=0?'+':'') + n.toFixed(2) + '%';
+const cls = n => n > 0 ? 'up' : (n < 0 ? 'down' : '');
+/* Allocation drift is NOT profit: being 21pp *over* target is no better than
+   21pp under. Colour by how far off you are, never by the sign. */
+/* Drift is coloured by DIRECTION, not distance.
+   Being short of a target and being over one are not the same problem: short
+   means money is missing from where it should be working, over means it is
+   concentrated. Colouring both red said "something is wrong" without saying
+   which, and made a healthy overweight look like a shortfall.
+     short  -> red     (add to this)
+     over   -> amber   (concentrated, but nothing is missing)
+     on mark-> green   (leave it alone) */
+const DRIFT_BAND = 3;                       // within 3 points is on target
+const driftCls = d =>
+  d <= -DRIFT_BAND ? 'down' : (d >= DRIFT_BAND ? 'gold' : 'up');
+const BUCKET = {stocks:'#D9A441', bonds:'#7FB069', gold:'#E0B44E',
+                cash:'#A8937A', crypto:'#B85A3C', other:'#5A4A3A'};
+const LABEL  = {stocks:'Stocks', bonds:'Bonds', gold:'Gold', savings:'Savings',
+                cash:'Cash', crypto:'Crypto', other:'Other'};
+
+let TOKEN = localStorage.getItem('lb_token') || '';
+const qp = new URLSearchParams(location.search);
+if (qp.get('t')) {                       // store, then scrub from history
+  TOKEN = qp.get('t');
+  localStorage.setItem('lb_token', TOKEN);
+  history.replaceState({}, '', location.pathname);
+}
+
+function saveToken(){
+  TOKEN = document.getElementById('tok').value.trim();
+  localStorage.setItem('lb_token', TOKEN);
+  boot();
+}
+
+// Declared up here, not beside the pull-to-refresh code: `let` is not hoisted,
+// boot() runs before that block, and load() stamps this on its first call --
+// which would have thrown a ReferenceError and blanked the whole dashboard.
+let LAST_LOAD = 0;
+
+async function api(path, method='GET'){
+  const r = await fetch(path, {
+    method,
+    headers:{Authorization:'Bearer '+TOKEN},
+    cache:'no-store'
+  });
+  if (r.status === 401) throw new Error('unauthorized');
+  // 403 is not an auth failure: the token was accepted and this deployment is
+  // read-only. Retrying would loop, so it must not reach the login screen.
+  if (r.status === 403) throw new Error('read-only');
+  if (!r.ok) throw new Error('http '+r.status);
+  return r.json();
+}
+
+function tab(name){
+  document.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.id === 'p'+'-'+name));
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.p === name));
+  window.scrollTo({top:0, behavior:'instant'});
+  // Settings has no nav button (it lives behind the gear), so remembering it as
+  // the last tab would reopen the app on a screen with nothing highlighted.
+  if (name !== 'settings') localStorage.setItem('lb_tab', name);
+  if (name === 'settings') loadSettings();
+}
+
+/* --------------------------------------------------------- the granary */
+function drawBarn(fill){                 // fill: 0..1
+  const f = Math.max(0, Math.min(1, fill));
+  // Grain rises inside the body only. Body spans y 61 (top) -> 114 (floor).
+  const top = 66, floor = 124, h = (floor - top) * f, y = floor - h;
+  document.getElementById('barnSvg').innerHTML = `
+    <defs>
+      <clipPath id="bodyClip">
+        <path d="M54,66 L146,66 L139,124 L61,124 Z"/>
+      </clipPath>
+    </defs>
+    <rect x="68" y="124" width="8" height="26" rx="2" fill="#2A211A"/>
+    <rect x="88" y="124" width="8" height="26" rx="2" fill="#2A211A"/>
+    <rect x="104" y="124" width="8" height="26" rx="2" fill="#2A211A"/>
+    <rect x="124" y="124" width="8" height="26" rx="2" fill="#2A211A"/>
+    <rect x="52" y="150" width="96" height="4" rx="2" fill="#2A211A"/>
+    <path d="M54,66 L146,66 L139,124 L61,124 Z" fill="#33281F" stroke="#5A4735" stroke-width="2"/>
+    <g clip-path="url(#bodyClip)">
+      <rect x="48" y="${y}" width="104" height="${h}" fill="#D9A441"/>
+      <rect x="48" y="${y}" width="104" height="3" fill="#F0C86A"/>
+    </g>
+    <path d="M8,18 Q100,64 192,18 L166,50 Q100,82 34,50 Z" fill="#D9A441"/>
+    <path d="M17,26 Q100,72 183,26 L166,50 Q100,82 34,50 Z" fill="#B07E2E"/>`;
+}
+
+/* ---------------------------------------------------------------- load */
+async function load(){
+  const d = await api('/api/summary');
+  // Before anything renders: is this page still the current one?
+  checkUiVersion(d.ui_version);
+
+  /* header */
+  const cm = document.getElementById('chipMode');
+  cm.textContent = d.bot.halted ? 'STOPPED' : d.bot.mode.toUpperCase();
+  cm.className = 'chip ' + (d.bot.halted ? 'halt' : d.bot.mode);
+  LAST_LOAD = Date.now();
+  stampAge();
+
+  /* attention banners, most serious first */
+  const al = [];
+  if (d.bot.stale && d.bot.positions > 0)
+    al.push(['bad','Engine not running','A position is open and its stop-loss is not being watched.']);
+  else if (d.bot.stale)
+    al.push(['warn','Engine not running','Start it before the bot can trade.']);
+  if (d.bot.halted)
+    al.push(['warn','Bot stopped', d.bot.halt_reason || 'Press Resume on the Bot tab.']);
+  if (d.emergency.shortfall > 0)
+    al.push(['warn','Safety net short', `${rpS(d.emergency.shortfall)} below ${(d.emergency.target/d.cashflow.spending).toFixed(0)} months of spending.`]);
+  document.getElementById('alerts').innerHTML = al.map(([k,t,m]) =>
+    `<div class="banner ${k}"><div><b>${t}</b>${m}</div></div>`).join('');
+
+  /* home */
+  document.getElementById('nw').textContent = rp(d.net_worth);
+  document.getElementById('nwNote').innerHTML =
+    `Passive income <b class="gold">${rp(d.passive_monthly)}</b> a month`
+    + `<span class="sub" style="display:block;margin-top:2px">`
+    + `${rpS(d.stock_dividends||0)} dividends + ${rpS(d.interest_monthly||0)} interest`
+    + `</span>`;
+
+  const g = d.goal;
+  drawBarn(g.progress_pct/100);
+  document.getElementById('barnPct').innerHTML =
+    g.years === null ? '—'
+    : `<span class="gold">${g.years} years</span> to ${rpS(g.target_monthly)} a month`;
+  document.getElementById('barnCap').textContent =
+    `${rpS(d.net_worth)} of ${rpS(g.capital_required)} · ${g.progress_pct.toFixed(0)}% full`;
+
+  document.getElementById('tSurplus').textContent = rpS(d.cashflow.surplus);
+  document.getElementById('tRate').textContent = d.cashflow.savings_rate.toFixed(0)+'%';
+  document.getElementById('tDiv').textContent = rpS(d.passive_monthly);
+  const ef = document.getElementById('tEf');
+  // A bare "7.4 mo" in red does not say short of WHAT. The target is the
+  // whole point of the colour, so it goes next to the number.
+  const efTarget = d.cashflow.spending
+    ? Math.round(d.emergency.target / d.cashflow.spending) : 0;
+  // months_free, not months_liquid: money promised to something else is not
+  // a safety net. The two are equal until a commitment is recorded.
+  ef.innerHTML = (d.emergency.months_free ?? d.emergency.months_liquid).toFixed(1)
+    + (efTarget ? `<span class="sub" style="display:inline;margin-left:4px">/ ${efTarget} mo</span>` : ' mo');
+  ef.className = 'v ' + (d.emergency.shortfall > 0 ? 'down' : 'up');
+  const cf = d.cashflow;
+  document.getElementById('kSaving').textContent = cf.spending_tracked ? 'Saving (real)' : 'Saving (est)';
+  document.getElementById('flowNote').textContent =
+    `You keep ${rpS(cf.surplus)} of ${rpS(cf.income)} each month.`;
+
+  // Say where the spending figure came from. An assumed number shown as fact is
+  // how a plan drifts away from what is actually happening.
+  const rows = [];
+  if (cf.spending_tracked) {
+    const over = cf.spending > cf.spending_budgeted;
+    rows.push(`<div class="row"><div class="l"><div class="name">Actually spending</div>
+        <div class="sub">${cf.spending_basis}</div></div>
+      <div class="r"><div class="name ${over ? 'down' : 'up'}">${rpS(cf.spending)}</div></div></div>`);
+    rows.push(`<div class="row"><div class="l"><div class="name">You budgeted</div></div>
+      <div class="r"><div class="name">${rpS(cf.spending_budgeted)}</div></div></div>`);
+    rows.push(`<div class="row"><div class="l"><div class="name">Range</div>
+        <div class="sub">swings ${cf.spending_swing_pct.toFixed(0)}% between months</div></div>
+      <div class="r"><div class="name">${rpS(cf.spending_low)} – ${rpS(cf.spending_high)}</div></div></div>`);
+    if (cf.current_month > 0) {
+      rows.push(`<div class="row"><div class="l"><div class="name">This month so far</div>
+          <div class="sub">not counted in the average</div></div>
+        <div class="r"><div class="name">${rpS(cf.current_month)}</div></div></div>`);
+    }
+    if (over) {
+      rows.push(`<div class="banner warn" style="margin-top:12px"><div>
+        <b>Above baseline</b>Recent months averaged ${rpS(cf.spending)}, which is
+        ${rpS(cf.spending - cf.spending_budgeted)} above the ${rpS(cf.spending_budgeted)} you
+        plan on. If that gap is one-offs - a repair, a financed purchase, freelance costs -
+        it is fine, and your plan still holds. If it is your normal spending, raise the
+        baseline in Settings: measured against the average there would be
+        ${rpS(cf.surplus_measured ?? 0)} a month to invest, not ${rpS(cf.surplus)}.</div></div>`);
+    }
+  } else {
+    // "Not enough to average" is NOT "nothing logged". Saying the latter when a
+    // purchase has been recorded reads as the logging having failed.
+    rows.push(`<div class="row"><div class="l"><div class="name">Planning on</div>
+        <div class="sub">your entered figure, not yet a measurement</div></div>
+      <div class="r"><div class="name warn">${rpS(cf.spending_budgeted)}</div></div></div>`);
+    if (cf.current_month > 0) {
+      rows.push(`<div class="row"><div class="l"><div class="name">This month so far</div>
+          <div class="sub">recorded — see Plan tab for the list</div></div>
+        <div class="r"><div class="name up">${rpS(cf.current_month)}</div></div></div>`);
+      rows.push(`<div class="banner warn" style="margin-top:12px"><div>
+        <b>Still using your estimate</b>An average needs a full month with at least
+        3 purchases in it. This month is still running, so it is shown but not
+        averaged — otherwise a part-finished month would understate what you spend.</div></div>`);
+    } else {
+      rows.push(`<div class="banner warn" style="margin-top:12px"><div>
+        <b>Nothing logged yet</b>Record purchases and this switches to what you really
+        spend. Until then every number above rests on ${rpS(cf.spending_budgeted)}
+        being right.</div></div>`);
+    }
+  }
+  document.getElementById('spendBox').innerHTML = rows.join('');
+
+  /* portfolio */
+  document.getElementById('alloc').innerHTML = d.buckets.map(b => `
+    <div>
+      <div class="hd">
+        <span>${LABEL[b.name]||b.name}</span>
+        <span class="sub" style="margin:0">${rpS(b.value)} · ${b.weight.toFixed(0)}%
+          <b class="${driftCls(b.drift)}">${b.drift>=0?'+':''}${b.drift.toFixed(0)}</b></span>
+      </div>
+      <div class="trk">
+        <i style="width:${Math.min(100,b.weight)}%;background:${BUCKET[b.name]||'#5A4A3A'}"></i>
+        <span class="goal" style="left:${Math.min(100,b.target)}%"></span>
+      </div>
+    </div>`).join('');
+
+  document.getElementById('assets').innerHTML = (d.assets || []).map(a => {
+    const yieldTxt = a.rate > 0
+      ? `${a.rate.toFixed(2)}% net · ${rpS(a.monthly)}/mo`
+      : 'no income — price only';
+    return `<div class="row">
+      <div class="l"><div class="name">${a.name}</div>
+        <div class="sub">${LABEL[a.kind]||a.kind} · ${yieldTxt}</div></div>
+      <div class="r"><div class="name">${rpS(a.value)}</div></div></div>`;
+  }).join('') + `<div class="row">
+      <div class="l"><div class="name">BCA</div>
+        <div class="sub">Cash · earns ~nothing, but LPS guaranteed</div></div>
+      <div class="r"><div class="name">${rpS(d.cash)}</div></div></div>`;
+
+  document.getElementById('holds').innerHTML = d.holdings.map(h => `
+    <div class="row">
+      <div class="l">
+        <div class="name">${h.ticker}
+          <span class="tag ${h.verdict.replace('?','')}">${h.verdict}</span></div>
+        <div class="sub">${h.lots} lot · ${rp(h.price)} · ${h.yield_pct.toFixed(1)}% yield</div>
+      </div>
+      <div class="r">
+        <div class="name">${rpS(h.value)}</div>
+        <div class="sub"><b class="${cls(h.pnl)}">${pc(h.pnl_pct)}</b> · ${h.weight.toFixed(0)}% of all</div>
+      </div>
+    </div>`).join('') || '<div class="sub">Nothing recorded.</div>';
+
+  /* bot */
+  document.getElementById('botEq').textContent = rp(d.bot.equity);
+  document.getElementById('botNote').innerHTML =
+    `${d.bot.positions} open · 30 days <b class="${cls(d.bot.pnl_30d)}">${rp(d.bot.pnl_30d)}</b>`;
+  // May not exist: applyMode() removes the whole controls block on a read-only
+  // deployment. Without this guard the first refresh after that throws here,
+  // and everything below -- safety net, commitments, wishes, goal -- silently
+  // stops updating while the page still looks alive.
+  const bp = document.getElementById('bPause');
+  if (bp){
+    bp.textContent = d.bot.halted ? 'Resume' : 'Pause';
+    bp.className = d.bot.halted ? 'go' : '';
+    bp.onclick = () => ctl(d.bot.halted ? 'resume' : 'pause');
+  }
+
+  /* plan */
+  // A bucket name is not an instruction. Say where the money actually goes.
+  const HOW = {
+    savings: 'Superbank — Tabungan Utama, instant access',
+    bonds:   'Bibit → SBN. Only while an offering is open',
+    stocks:  'Stockbit — run: lumbung recommend',
+    gold:    'Pegadaian — Tabungan Emas',
+    crypto:  'transfer to Indodax, then raise the sleeve to match',
+    cash:    'leave in BCA — earns nothing, but LPS guaranteed',
+  };
+  renderCutPlan(d);
+  document.getElementById('splan').innerHTML = d.surplus_plan
+    .filter(s => s.amount >= 50000)
+    .map(s => `<div class="row">
+      <div class="l"><div class="name">${LABEL[s.bucket]||s.bucket}</div>
+        <div class="sub">${HOW[s.bucket]||''}</div></div>
+      <div class="r"><div class="name gold">${rpS(s.amount)}</div></div></div>`).join('')
+    || '<div class="sub">Everything is on target.</div>';
+
+  const e = d.emergency;
+  const committed = e.committed || 0;
+  document.getElementById('efDetail').innerHTML = `
+    <div class="row"><div class="l"><div class="name">Covered</div>
+      <div class="sub">cash plus gold, both sellable same day</div></div>
+      <div class="r"><div class="name">${e.months_liquid.toFixed(1)} months</div></div></div>`
+    + (committed > 0 ? `
+    <div class="row"><div class="l"><div class="name">Committed</div>
+      <div class="sub">already promised, held liquid</div></div>
+      <div class="r"><div class="name down">− ${rpS(committed)}</div></div></div>
+    <div class="row"><div class="l"><div class="name">Really free</div>
+      <div class="sub">what is actually your buffer</div></div>
+      <div class="r"><div class="name ${e.shortfall>0?'down':'up'}">${(e.months_free ?? 0).toFixed(1)} months</div></div></div>` : '')
+    + `
+    <div class="row"><div class="l"><div class="name">Cash only</div>
+      <div class="sub">without selling any gold</div></div>
+      <div class="r"><div class="name">${e.months_cash.toFixed(1)} months</div></div></div>
+    <div class="row"><div class="l"><div class="name">Target</div></div>
+      <div class="r"><div class="name">${rpS(e.target)}</div></div></div>`
+    + (d.commitments || []).map(c => `
+    <div class="row"><div class="l"><div class="name">${c.name}</div>
+      <div class="sub">${c.due ? c.due + (c.days != null ? ` · ${c.days} days` : '') : 'no date'}</div></div>
+      <div class="r"><div class="name">${rpS(c.amount)}</div></div></div>`).join('');
+
+  // Wishes are deliberately outside the safety-net card: they are priced, not
+  // promised, and nothing here reduces the buffer.
+  /* Also owned. Shown apart from the allocation on purpose: counting a house
+     among the investments turns a real 48% concentration into a comfortable
+     12% without changing a single risk. */
+  const posBox = document.getElementById('possessions');
+  if (posBox){
+    const ps = d.possessions || [];
+    if (!ps.length){
+      posBox.innerHTML = '<div class="sub">Nothing recorded.</div>';
+    } else {
+      const unset = ps.filter(p => !p.value).map(p => p.name);
+      posBox.innerHTML = ps.map(p => `
+    <div class="row"><div class="l"><div class="name">${p.name}</div>
+      <div class="sub">${p.depreciating ? 'falls in value' : ''}</div></div>
+      <div class="r"><div class="name">${p.value ? rpS(p.value) : '<span class="sub">not set</span>'}</div></div></div>`).join('')
+        + `<div class="row"><div class="l"><div class="name">Everything owned</div>
+      <div class="sub">investable plus these</div></div>
+      <div class="r"><div class="name gold">${rpS(d.total_with_possessions ?? 0)}</div></div></div>`
+        + '<div class="sub">Not investments, and kept out of the allocation above.'
+        + (unset.length ? ' No value set for ' + unset.join(', ') + '.' : '')
+        + '</div>';
+    }
+  }
+
+  const wishBox = document.getElementById('wishDetail');
+  if (wishBox) {
+    const ws = d.wishes || [];
+    const months = d.emergency_months_target || 6;
+    wishBox.innerHTML = ws.length ? ws.map(w => {
+      // The verdict is the whole point of the card: not "can I afford it" but
+      // "can I afford it and still have a safety net afterwards".
+      let verdict, cls;
+      if (w.safe_now){ verdict = 'safe to buy now'; cls = 'up'; }
+      else if (w.safe_when){
+        const dt = new Date(w.safe_when + 'T00:00:00');
+        verdict = 'wait until ' + dt.toLocaleDateString(undefined, {day:'numeric', month:'short', year:'numeric'});
+        cls = 'down';
+      } else { verdict = 'not within five years'; cls = 'down'; }
+      return `
+    <div class="row"><div class="l"><div class="name">${w.name}</div>
+      <div class="sub">${w.months_of_saving != null ? w.months_of_saving.toFixed(1) + ' months of saving' : ''}</div></div>
+      <div class="r"><div class="name">${rpS(w.amount)}</div>
+      <div class="sub ${cls}">${verdict}</div></div></div>
+    <div class="row"><div class="l"><div class="sub">buying today leaves ${(w.months_if_bought_now ?? 0).toFixed(1)} months${(w.safe_now || w.safe_when) ? ' · then ' + (w.months_after ?? 0).toFixed(1) + ' months' : ''}</div></div>
+      <div class="r"><div class="sub">need ${months}</div></div></div>`;
+    }).join('') + `<div class="sub">Safe means you can pay for it and still cover ${months} months afterwards, counting what you already owe. Nothing here holds back your bonds or savings.</div>`
+      : '<div class="sub">Nothing on the list.</div>';
+  }
+
+  document.getElementById('goalDetail').innerHTML = `
+    <div class="row"><div class="l"><div class="name">Aiming for</div></div>
+      <div class="r"><div class="name gold">${rpS(g.target_monthly)} a month</div></div></div>
+    <div class="row"><div class="l"><div class="name">Earning now</div>
+        <div class="sub">${rpS(d.stock_dividends||0)} dividends + ${rpS(d.interest_monthly||0)} interest</div></div>
+      <div class="r"><div class="name up">${rpS(d.passive_monthly)}</div></div></div>
+    <div class="row"><div class="l"><div class="name">Needs</div>
+      <div class="sub">invested, living off the yield at
+        ${(d.goal_yield_pct||0).toFixed(2)}%</div></div>
+      <div class="r"><div class="name">${rpS(g.capital_required)}</div></div></div>
+    <div class="row"><div class="l"><div class="name">Blended yield</div>
+      <div class="sub">from your target allocation — gold, cash and crypto
+        pay nothing and drag this down</div></div>
+      <div class="r"><div class="name">${(d.goal_yield_pct||0).toFixed(2)}%</div></div></div>
+    <div class="row"><div class="l"><div class="name">You have</div></div>
+      <div class="r"><div class="name">${rpS(d.net_worth)}</div></div></div>
+    <div class="row"><div class="l"><div class="name">At this saving rate</div></div>
+      <div class="r"><div class="name up">${g.years === null ? '—' : g.years + ' years'}</div></div></div>`;
+
+  drawSpark(); loadPositions(); loadEvents(); loadExpenses(); applyMode();
+}
+
+async function drawSpark(){
+  try{
+    const {points} = await api('/api/equity?limit=300');
+    const svg = document.getElementById('spark');
+    if (points.length < 2){
+      svg.innerHTML = '<text x="4" y="36" fill="#A8937A" font-size="12">no history yet</text>';
+      return;
+    }
+    const v = points.map(p=>p.v), lo = Math.min(...v), hi = Math.max(...v), rng = (hi-lo)||1;
+    const pts = points.map((p,i)=>`${(i/(points.length-1))*300},${60-((p.v-lo)/rng)*52}`).join(' ');
+    const col = v[v.length-1] >= v[0] ? '#7FB069' : '#C4553D';
+    svg.innerHTML =
+      `<polyline points="${pts}" fill="none" stroke="${col}" stroke-width="2"
+        stroke-linejoin="round" stroke-linecap="round"/>`;
+  }catch(e){}
+}
+
+async function loadPositions(){
+  try{
+    const {positions} = await api('/api/positions');
+    document.getElementById('positions').innerHTML = positions.map(p => `
+      <div class="row">
+        <div class="l"><div class="name">${p.pair.replace('_idr','').toUpperCase()}</div>
+          <div class="sub">stop ${rp(p.stop)}</div></div>
+        <div class="r"><div class="name">${rpS(p.value)}</div>
+          <div class="sub"><b class="${cls(p.pnl)}">${pc(p.pnl_pct)}</b></div></div>
+      </div>`).join('') || '<div class="sub">None right now.</div>';
+  }catch(e){}
+}
+
+let READONLY = null;
+async function applyMode(){
+  if (READONLY !== null) return;
+  try{
+    const c = await api('/api/config');
+    READONLY = !!c.readonly;
+    if (READONLY){
+      // Hide rather than disable: a button that always errors is worse than no
+      // button, and this deployment genuinely cannot act.
+      const acts = document.querySelector('#p-bot .acts');
+      if (acts) acts.outerHTML =
+        '<div class="banner warn"><div><b>Read-only</b>' +
+        'Controls are disabled on this deployment. Open the dashboard on ' +
+        'your home network to pause, flatten or kill.</div></div>';
+    }
+  }catch(e){}
+}
+
+async function loadExpenses(){
+  try{
+    const e = await api('/api/expenses?days=90');
+    if (!e.count){
+      document.getElementById('expSummary').innerHTML =
+        `<div class="sub">Nothing logged in 90 days. Send the bot
+         <b>/spend 250000 groceries food</b>, or just tell it what you spent.</div>`;
+      document.getElementById('expCats').innerHTML = '';
+      document.getElementById('expList').innerHTML = '';
+      return;
+    }
+    document.getElementById('expSummary').innerHTML =
+      `<div class="hero sm">${rpS(e.total)}</div>
+       <div class="note">${e.count} purchases over ${e.days} days</div>`;
+    document.getElementById('expCats').innerHTML = e.categories.map(c => `
+      <div style="margin-top:10px">
+        <div class="hd" style="display:flex;justify-content:space-between;font-size:13.5px">
+          <span style="text-transform:capitalize">${c.name}</span>
+          <span class="sub" style="margin:0">${rpS(c.total)} · ${c.share.toFixed(0)}%</span>
+        </div>
+        <div class="trk"><i style="width:${c.share}%;background:var(--thatch)"></i></div>
+      </div>`).join('');
+    document.getElementById('expList').innerHTML = e.recent.map(r => {
+      const d = new Date(r.ts*1000).toLocaleDateString('en-GB',{day:'2-digit',month:'short'});
+      return `<div class="row">
+        <div class="l"><div class="name">${r.item}</div>
+          <div class="sub">${d} · ${r.category} · ${r.method}</div></div>
+        <div class="r"><div class="name">${rpS(r.amount)}</div></div></div>`;
+    }).join('');
+  }catch(err){}
+}
+
+async function loadEvents(){
+  try{
+    const {events} = await api('/api/events?limit=14');
+    document.getElementById('events').innerHTML = events.map(e => {
+      const t = new Date(e.ts*1000).toLocaleString('en-GB',
+        {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+      return `<div class="ev"><time>${t}</time><span>${e.msg}</span></div>`;
+    }).join('') || '<div class="sub">Nothing yet.</div>';
+  }catch(e){}
+}
+
+async function ctl(action){
+  const ask = {flat:'Sell every crypto position at market price now?',
+               kill:'Stop the bot and sell everything?'}[action];
+  if (ask && !confirm(ask)) return;
+  try{
+    await api('/api/'+action,'POST');
+    await api('/api/refresh','POST');
+    load();
+  }catch(e){ alert('Failed: '+e.message); }
+}
+
+/* ---------------------------------------------------------------- boot */
+function showLogin(msg){
+  document.getElementById('app').hidden = true;
+  document.getElementById('login').hidden = false;
+  if (msg) document.getElementById('loginErr').textContent = msg;
+}
+
+/* ------------------------------------------------------------ checklist */
+const SEV = {urgent:'urgent', soon:'soon', idea:'idea'};
+
+async function loadActions(){
+  let d;
+  try { d = await api('/api/actions'); }
+  catch(e){ document.getElementById('actList').innerHTML =
+    `<div class="ad">Could not load recommendations: ${e.message}</div>`; return; }
+
+  const badge = document.getElementById('doBadge');
+  const urgent = d.actions.filter(a => a.severity === 'urgent').length;
+  badge.style.display = urgent ? '' : 'none';
+  badge.textContent = urgent;
+
+  document.getElementById('actSummary').textContent =
+    d.open === 0 ? 'Nothing needs doing.' : `${d.open} to do`;
+
+  document.getElementById('actList').innerHTML = d.actions.map(a => `
+    <div class="act" id="act-${a.id}">
+      <div style="min-width:0">
+        <div class="at">${a.title}<span class="pill ${SEV[a.severity]||'idea'}">${a.severity}</span></div>
+        <div class="ad">${a.detail}</div>
+        ${a.stale_hint ? `<div class="hint">Once done, update <b>${a.stale_hint}</b> in Settings so the numbers stay true.</div>` : ''}
+      </div>
+    </div>`).join('') || '<div class="ad">Nothing to do right now.</div>';
+
+}
+
+/* -------------------------------------------------------------- settings */
+/* Grouped into cards, with allocation on sliders. A percentage means very
+   little on its own; next to where you actually are, it means something. */
+let SETTINGS = null, SETDIRTY = {};
+
+const IDR = n => 'Rp ' + Math.round(n).toLocaleString('en-US');
+
+function moneyRow(key, f){
+  const v = f.value == null ? '' : Math.round(f.value).toLocaleString('en-US');
+  const unit = f.kind === 'int' ? '' : 'Rp';
+  return `<div class="mrow">
+    <label for="f-${key}">${f.label}</label>
+    <div class="box">${unit ? `<span>${unit}</span>` : ''}
+      <input id="f-${key}" data-k="${key}" data-kind="${f.kind}" value="${v}"
+             inputmode="numeric" oninput="onFieldEdit(this)"></div>
+  </div>`;
+}
+
+function allocRow(key, f, nowPct){
+  const name = key.split('.')[1];
+  const tgt = Math.round((f.value || 0) * 100);
+  return `<div class="arow" data-alloc="${key}">
+    <div class="ahead">
+      <b>${name}</b>
+      <span class="now">now ${nowPct.toFixed(0)}%</span>
+      <span class="tgt" id="t-${name}">${tgt}%</span>
+    </div>
+    <div class="abar">
+      <i style="width:${Math.min(100, nowPct)}%"></i>
+      <u id="m-${name}" style="left:calc(${Math.min(100, tgt)}% - 1px)"></u>
+    </div>
+    <input type="range" min="0" max="60" step="1" value="${tgt}"
+           data-k="${key}" data-kind="pct" oninput="onAllocEdit(this)">
+  </div>`;
+}
+
+async function loadSettings(discard){
+  if (discard){ SETDIRTY = {}; markDirty(); }
+  let d;
+  try { d = await api('/api/settings'); }
+  catch(e){ document.getElementById('setGroups').innerHTML =
+    `<div class="setcard"><div class="why">Could not load settings: ${e.message}</div></div>`;
+    return; }
+  SETTINGS = d;
+
+  // Current shares, so a target slider can be read against reality.
+  let now = {};
+  try{
+    const sum = await api('/api/summary');
+    (sum.buckets||[]).forEach(b => { now[b.name] = b.weight; });
+  }catch(e){ /* the sliders still work without it */ }
+
+  const groups = d.groups || [];
+  document.getElementById('setGroups').innerHTML = groups.map(g => {
+    const isAlloc = g.keys.some(k => k.startsWith('target_allocation.'));
+    const rows = g.keys.filter(k => d.fields[k]).map(k =>
+      isAlloc ? allocRow(k, d.fields[k], now[k.split('.')[1]] || 0)
+              : moneyRow(k, d.fields[k])).join('');
+    return `<div class="setcard">
+      <h3>${g.title}</h3>
+      ${g.hint ? `<div class="why">${g.hint}</div>` : ''}
+      ${rows}
+      ${isAlloc ? `<div class="alloctot"><span>Adds up to</span>
+        <b id="allocSum">—</b></div>` : ''}
+    </div>`;
+  }).join('');
+
+  document.getElementById('setSecrets').innerHTML =
+    Object.entries(d.secrets).map(([k,sec]) => `
+      <div class="mrow">
+        <label for="s-${k}">${sec.label}
+          <span class="keystate ${sec.configured ? 'yes' : 'no'}">
+            ${sec.configured ? 'set' : 'not set'}</span>
+        </label>
+        <div class="box"><input id="s-${k}" data-k="${k}"
+             class="${sec.secret ? 'pw' : ''}"
+             type="${sec.secret ? 'password' : 'text'}"
+             value="${sec.secret ? '' : (sec.value||'')}"
+             placeholder="${sec.secret ? (sec.configured ? 'leave blank to keep' : 'paste here') : ''}"
+             autocomplete="off" spellcheck="false"></div>
+      </div>`).join('');
+
+  const me = await api('/api/whoami').catch(() => ({access:false, email:''}));
+  document.getElementById('sessWho').textContent =
+    me.email ? `Signed in as ${me.email} via Cloudflare Access.`
+             : 'Signed in with a dashboard token on this device.';
+
+  recalcAlloc();
+  markDirty();
+}
+
+function onFieldEdit(el){
+  // Reformat as you type so a long number stays readable. Without this
+  // "17000000" and "1700000" look almost identical at a glance.
+  const raw = el.value.replace(/[^\d]/g, '');
+  if (raw) el.value = parseInt(raw, 10).toLocaleString('en-US');
+  SETDIRTY[el.dataset.k] = raw;
+  markDirty();
+}
+
+function onAllocEdit(el){
+  const name = el.dataset.k.split('.')[1];
+  document.getElementById('t-' + name).textContent = el.value + '%';
+  document.getElementById('m-' + name).style.left =
+    `calc(${Math.min(100, +el.value)}% - 1px)`;
+  SETDIRTY[el.dataset.k] = String(+el.value / 100);
+  recalcAlloc();
+  markDirty();
+}
+
+function recalcAlloc(){
+  const el = document.getElementById('allocSum');
+  if (!el) return;
+  const sliders = [...document.querySelectorAll('input[type=range][data-k]')];
+  const sum = sliders.reduce((t,i) => t + (+i.value||0), 0);
+  el.textContent = sum + '%';
+  el.className = Math.abs(sum-100) < 0.5 ? 'ok' : (sum > 100 ? 'over' : 'under');
+}
+
+function markDirty(){
+  const n = Object.keys(SETDIRTY).length;
+  const bar = document.getElementById('setBar');
+  bar.classList.toggle('on', n > 0);
+  document.body.classList.toggle('settings-dirty', n > 0);
+  document.getElementById('setBarWhat').textContent =
+    n === 1 ? '1 change' : `${n} changes`;
+}
+
+async function saveSettings(){
+  const msg = document.getElementById('setMsg') || document.createElement('div');
+  const fields = {};
+  Object.entries(SETDIRTY).forEach(([k,v]) => { if (v !== '') fields[k] = v; });
+  if (!Object.keys(fields).length) return;
+
+  const bar = document.getElementById('setBar');
+  bar.classList.remove('on');
+  try{
+    const r = await fetch('/api/settings', {
+      method:'POST',
+      headers:{'Content-Type':'application/json', Authorization:'Bearer '+TOKEN},
+      body: JSON.stringify({fields})
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || j.detail || ('http '+r.status));
+    SETDIRTY = {};
+    await loadSettings();
+    load();
+    loadActions();
+  }catch(e){
+    bar.classList.add('on');
+    document.getElementById('setBarWhat').textContent = e.message;
+  }
+}
+
+function signOut(){
+  const msg = document.getElementById('sessMsg');
+  msg.className = 'msg'; msg.textContent = 'Signing out…';
+  // The bearer token is deliberately NOT cleared. It identifies the device, not
+  // the person, and dropping it here protects nothing -- it cannot reach the
+  // localStorage of the phone you lost. All it would achieve is making you
+  // paste 32 characters again on the one device you still hold.
+  //
+  // Cloudflare holds the session, so ending it there ends it everywhere. Access
+  // serves its logout on the app's own hostname, so this needs no team-domain
+  // configuration and keeps working if the team is renamed.
+  location.href = '/cdn-cgi/access/logout';
+}
+
+async function saveSecrets(){
+  const msg = document.getElementById('secMsg');
+  const secrets = {};
+  document.querySelectorAll('#setSecrets input').forEach(i => {
+    const v = i.value.trim();
+    if (v) secrets[i.dataset.k] = v;      // blank means "keep what is there"
+  });
+  if (!Object.keys(secrets).length){
+    msg.className = 'msg bad'; msg.textContent = 'Nothing filled in.'; return;
+  }
+  msg.className = 'msg'; msg.textContent = 'Saving…';
+  try{
+    const r = await fetch('/api/settings/secrets', {
+      method:'POST',
+      headers:{'Content-Type':'application/json', Authorization:'Bearer '+TOKEN},
+      body: JSON.stringify({secrets})
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || j.detail || ('http '+r.status));
+    msg.className = 'msg ok';
+    msg.textContent = 'Saved. Restart the engine for key changes to take effect.';
+    document.querySelectorAll('#setSecrets input[type=password]').forEach(i => i.value='');
+    loadSettings();
+  }catch(e){
+    msg.className = 'msg bad'; msg.textContent = e.message;
+  }
+}
+
+async function boot(){
+  // With Cloudflare Access in front, the visitor is already authenticated and
+  // the request carries a signed assertion -- so try loading with no token at
+  // all before showing a login screen that would only be friction.
+  if (!TOKEN){
+    try{
+      await load();
+      document.getElementById('login').hidden = true;
+      document.getElementById('app').hidden = false;
+      tab(localStorage.getItem('lb_tab') || 'home');
+      loadActions();
+      openAnswerStream();
+      return;
+    }catch(e){
+      return showLogin('');
+    }
+  }
+  try{ await load(); }
+  catch(e){
+    if (e.message === 'unauthorized') return showLogin('That token was not accepted.');
+    document.getElementById('chipTime').textContent = 'offline';
+    return;
+  }
+  document.getElementById('login').hidden = true;
+  document.getElementById('app').hidden = false;
+  tab(localStorage.getItem('lb_tab') || 'home');
+  loadActions();          // so the urgent badge is right without opening the tab
+  openAnswerStream();     // answers arrive on their own, sheet open or not
+  showInstall();
+}
+
+boot();
+/* ------------------------------------------------------------------ chat */
+/* One dispatcher, shared with the CLI, so a command means the same thing
+   wherever it is typed.
+   Anything that is not a command becomes a question for a Claude session --
+   which takes as long as it takes, hence the thinking state and the stop. */
+let chatBusy = false;
+let answerSeen = 0, answerTimer = null, thinkEl = null;
+
+function openChat(){
+  document.getElementById('chatSheet').classList.add('on');
+  document.getElementById('chatFab').classList.add('hide');
+  // Remember where the page was: `position:fixed` on the body scrolls it to
+  // the top, and returning you somewhere else than where you left is worse
+  // than the scrollbar it fixes.
+  window._scrollY = window.scrollY;
+  document.body.classList.add('chatopen');
+  document.body.style.top = `-${window._scrollY}px`;
+  loadChat();
+  setTimeout(() => document.getElementById('chatIn').focus(), 80);
+}
+
+function closeChat(){
+  document.getElementById('chatSheet').classList.remove('on');
+  document.getElementById('chatFab').classList.remove('hide');
+  document.body.classList.remove('chatopen');
+  document.body.style.top = '';
+  window.scrollTo(0, window._scrollY || 0);
+}
+
+function resetChat(){
+  // Clears the view AND the memory: /api/chat/reset drops a marker that
+  // hides pre-reset history from /api/chat/history and makes the answering
+  // worker open a fresh model session. The jsonl files are never touched --
+  // they are the record of what was actually asked.
+  fetch('/api/chat/reset', {method: 'POST'}).catch(() => {});
+  const log = document.getElementById('chatLog');
+  log.innerHTML = '';
+  delete log.dataset.loaded;
+  stopThinking();
+  loadChat();
+}
+
+function mdToHtml(src){
+  // Escape first; the only tags in the output are the ones emitted here.
+  // Headers, lists, **bold**, `code`, quotes and links are what GLM
+  // actually sends; anything else passes through as plain text.
+  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const codes = [];
+  let text = esc(src).replace(/```[a-zA-Z0-9+#_-]*\n?([\s\S]*?)```/g, (m, code) => {
+    codes.push('<pre><code>' + code.replace(/\n$/,'') + '</code></pre>');
+    return '\u0000' + (codes.length-1) + '\u0000';
+  });
+  const inline = s => s
+    .replace(/`([^`\n]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>')
+    .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  // GFM tables: header row, |---|---| separator, body rows. Rendered in
+  // full here (esc already ran) and stashed behind a placeholder, like
+  // code fences, so the line loop treats the table as one block.
+  const tables = [];
+  {
+    const L = text.split('\n');
+    const isSep = r => /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/.test(r) && r.includes('-');
+    const cells = r => r.replace(/^\s*\|/, '').replace(/\|\s*$/, '').split('|').map(c => c.trim());
+    const conv = [];
+    let i = 0;
+    while (i < L.length){
+      if (L[i].trim().startsWith('|') && i+1 < L.length && isSep(L[i+1])){
+        const al = cells(L[i+1]).map(c => /^:-+:$/.test(c) ? ' style="text-align:center"' : /-+:$/.test(c) ? ' style="text-align:right"' : '');
+        let h = '<div class="tbl"><table><thead><tr>' +
+          cells(L[i]).map((c, j) => '<th'+(al[j]||'')+'>'+inline(c)+'</th>').join('') +
+          '</tr></thead>';
+        i += 2;
+        let body = '';
+        while (i < L.length && L[i].trim().startsWith('|')){
+          body += '<tr>' + cells(L[i]).map(c => '<td>'+inline(c)+'</td>').join('') + '</tr>';
+          i++;
+        }
+        tables.push(h + '<tbody>' + body + '</tbody></table></div>');
+        conv.push('\u0001' + (tables.length-1) + '\u0001');
+        continue;
+      }
+      conv.push(L[i]); i++;
+    }
+    text = conv.join('\n');
+  }
+  const out = [];
+  let list = null, para = [];
+  const flushPara = () => { if (para.length){ out.push('<p>'+inline(para.join('<br>'))+'</p>'); para = []; } };
+  const flushList = () => { if (list){ out.push('</'+list+'>'); list = null; } };
+  for (const raw of text.split('\n')){
+    const t = raw.trim();
+    if (!t){ flushPara(); flushList(); continue; }
+    let m;
+    if (/^[\u0000\u0001]\d+[\u0000\u0001]$/.test(t)){ flushPara(); flushList(); out.push(t); continue; }
+    if ((m = t.match(/^#{1,6}\s+(.*)/))){ flushPara(); flushList();
+      const h = Math.min(m[1].length+2, 6); out.push('<h'+h+'>'+inline(m[1])+'</h'+h+'>'); continue; }
+    if (/^(-{3,}|\*{3,})$/.test(t)){ flushPara(); flushList(); out.push('<hr>'); continue; }
+    if ((m = t.match(/^&gt;\s?(.*)/))){ flushPara(); flushList();
+      out.push('<blockquote>'+inline(m[1])+'</blockquote>'); continue; }
+    if ((m = t.match(/^[-\u2022*]\s+(.*)/))){ flushPara();
+      if (list!=='ul'){ flushList(); out.push('<ul>'); list='ul'; }
+      out.push('<li>'+inline(m[1])+'</li>'); continue; }
+    if ((m = t.match(/^\d+[.)]\s+(.*)/))){ flushPara();
+      if (list!=='ol'){ flushList(); out.push('<ol>'); list='ol'; }
+      out.push('<li>'+inline(m[1])+'</li>'); continue; }
+    flushList();
+    para.push(t);
+  }
+  flushPara(); flushList();
+  return out.join('').replace(/\u0001(\d+)\u0001/g, (m, i) => tables[+i]).replace(/\u0000(\d+)\u0000/g, (m, i) => codes[+i]);
+}
+
+function chatBubble(role, text){
+  const log = document.getElementById('chatLog');
+  const b = document.createElement('div');
+  b.className = 'bub ' + (role === 'you' ? 'you' : 'lum');
+  // Your words stay literal; Lumbung's answers are markdown.
+  if (role === 'you'){ b.textContent = text; }
+  else { b.classList.add('md'); b.innerHTML = mdToHtml(text); }
+  log.appendChild(b);
+  log.scrollTop = log.scrollHeight;
+  return b;
+}
+
+function startThinking(label){
+  stopThinking();
+  const log = document.getElementById('chatLog');
+  const w = document.createElement('div');
+  w.className = 'think';
+  w.innerHTML = '<div class="dots"><i></i><i></i><i></i></div>'
+    + `<span>${label || 'Thinking'}</span>`
+    + '<button onclick="stopThinking(true)">Stop</button>';
+  log.appendChild(w);
+  log.scrollTop = log.scrollHeight;
+  thinkEl = w;
+}
+
+function stopThinking(byUser){
+  clearInterval(answerTimer); clearTimeout(answerTimer);
+  if (thinkEl){ thinkEl.remove(); thinkEl = null; }
+  if (byUser) chatBubble('lumbung', 'Stopped waiting. The question is still in the queue — it will show up here when it is answered.');
+}
+
+function chatKey(e){
+  // Enter sends, Shift+Enter is a newline -- the convention everywhere else.
+  if (e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); chatSend(); }
+}
+
+function chatQuick(cmd){
+  document.getElementById('chatIn').value = cmd;
+  chatSend();
+}
+
+async function chatSend(){
+  const el = document.getElementById('chatIn');
+  const text = el.value.trim();
+  // Staged files make the text a caption, not a question. Send with no text is
+  // valid here -- the files are the message.
+  if (PENDING.length){
+    if (chatBusy) return;
+    el.value = '';
+    renderPending();
+    await chatUpload(text);
+    return;
+  }
+  if (!text || chatBusy) return;
+  chatBusy = true;
+  el.value = '';
+  chatBubble('you', text);
+  startThinking('Thinking');
+  try{
+    const r = await fetch('/api/chat', {
+      method:'POST',
+      headers:{'Content-Type':'application/json', Authorization:'Bearer '+TOKEN},
+      body: JSON.stringify({text})
+    });
+    const j = await r.json();
+    if (j.queued){
+      // No holding message: the dots ARE the holding message, and two of them
+      // reads like the answer arrived when it has not.
+      startThinking('Thinking');
+      pollAnswers();
+    } else {
+      stopThinking();
+      chatBubble('lumbung', j.reply || j.error || 'No answer.');
+    }
+  }catch(e){
+    stopThinking();
+    chatBubble('lumbung', 'Could not reach Lumbung.');
+  }
+  chatBusy = false;
+}
+
+/* Files wait here until you press send, so the text box can be their caption.
+   Firing the upload on `change` meant every file arrived with no idea what it
+   was, and had to be explained in a second message. */
+let PENDING = [];
+const MAX_PENDING = 8;
+
+function chatStage(input){
+  for (const f of input.files || []){
+    if (PENDING.length >= MAX_PENDING){
+      chatBubble('lumbung', 'Eight files at a time is the limit.');
+      break;
+    }
+    // Same file picked twice is almost always a slip, not an intention.
+    if (PENDING.some(x => x.name === f.name && x.size === f.size)) continue;
+    PENDING.push(f);
+  }
+  input.value = '';
+  renderPending();
+  document.getElementById('chatIn').focus();
+}
+
+function chatUnstage(i){ PENDING.splice(i, 1); renderPending(); }
+
+function kb(n){ return n < 1024*1024 ? Math.round(n/1024)+' KB'
+                                     : (n/1048576).toFixed(1)+' MB'; }
+
+function renderPending(){
+  const row = document.getElementById('pendRow');
+  if (!row) return;
+  row.innerHTML = PENDING.map((f, i) =>
+    `<div class="pend"><span>${f.name.replace(/[<>&]/g,'')}</span>`
+    + `<b>${kb(f.size)}</b>`
+    + `<button onclick="chatUnstage(${i})" title="Remove">&times;</button></div>`
+  ).join('');
+  const el = document.getElementById('chatIn');
+  if (el) el.placeholder = PENDING.length
+    ? 'Say what ' + (PENDING.length > 1 ? 'these are' : 'this is') + ' (optional)'
+    : 'Ask anything, or /help';
+}
+
+async function chatUpload(note){
+  if (!PENDING.length) return;
+  const files = PENDING.slice();
+  PENDING = [];
+  renderPending();
+  const names = files.map(f => f.name).join(', ');
+  chatBubble('you', (note ? note + '\n' : '') + 'Sent ' + names);
+  startThinking('Reading');
+  const fd = new FormData();
+  for (const f of files) fd.append('file', f);
+  if (note) fd.append('note', note);
+  try{
+    const r = await fetch('/api/chat/upload', {
+      method:'POST',
+      headers:{Authorization:'Bearer '+TOKEN},
+      body: fd
+    });
+    const j = await r.json();
+    if (j.ok){ pollAnswers(); }
+    else {
+      stopThinking();
+      chatBubble('lumbung', j.detail || j.error || 'Could not store those files.');
+      // Give them back rather than making the user pick them again.
+      PENDING = files; renderPending();
+    }
+  }catch(e){
+    stopThinking();
+    chatBubble('lumbung', 'Upload failed.');
+    PENDING = files; renderPending();
+  }
+}
+
+/* Answers are written by a Claude Code session, which may spend ten minutes
+   researching before it writes anything. The old budget was 60 tries x 4s = 4
+   minutes, so it announced "still no answer" while the work was still running.
+   Poll fast at first -- a command answers in under a second -- then slow down
+   and keep waiting a great deal longer. */
+function pollAnswers(){
+  clearInterval(answerTimer); clearTimeout(answerTimer);
+  let waited = 0;
+  const tick = async () => {
+    if (waited > 1200){
+      stopThinking();
+      chatBubble('lumbung', 'Still no answer. It stays in the queue — reopen this chat later and it will be here.');
+      return;
+    }
+    try{
+      const d = await api('/api/chat/history');
+      const fresh = (d.messages||[]).filter(m => m.role === 'lumbung' && m.ts > answerSeen);
+      if (fresh.length){
+        stopThinking();
+        fresh.forEach(m => { chatBubble('lumbung', m.text); answerSeen = m.ts; });
+        return;
+      }
+    }catch(e){ /* keep waiting quietly */ }
+    const gap = waited < 60 ? 4 : 15;
+    waited += gap;
+    answerTimer = setTimeout(tick, gap * 1000);
+  };
+  answerTimer = setTimeout(tick, 4000);
+}
+
+/* Live answers. Polling still runs underneath as a fallback -- if a proxy
+   eats the stream, answers must still arrive, just less promptly. Both paths
+   guard on answerSeen, so whichever wins, nothing shows twice. */
+let answerStream = null;
+
+/* The page records the server's UI stamp once, at boot. If it ever changes, the
+   file on disk moved on while this page stayed still -- which is exactly the
+   case a resumed PWA cannot notice by itself. */
+let UI_AT_BOOT = null;
+
+function checkUiVersion(v){
+  if (!v) return;
+  if (UI_AT_BOOT === null){ UI_AT_BOOT = v; return; }
+  if (v !== UI_AT_BOOT) document.getElementById('updateBar').hidden = false;
+}
+
+async function openAnswerStream(){
+  if (answerStream) return;
+  const ctrl = new AbortController();
+  answerStream = ctrl;
+  try{
+    const r = await fetch('/api/chat/stream', {
+      headers:{Authorization:'Bearer '+TOKEN},
+      cache:'no-store', signal: ctrl.signal
+    });
+    if (!r.ok || !r.body) throw new Error('no stream');
+    const reader = r.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    for(;;){
+      const {value, done} = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, {stream:true});
+      let i;
+      while ((i = buf.indexOf('\n\n')) >= 0){
+        const frame = buf.slice(0, i);
+        buf = buf.slice(i + 2);
+        for (const ln of frame.split('\n')){
+          if (!ln.startsWith('data:')) continue;   // ':' comments are keepalives
+          try{
+            const m = JSON.parse(ln.slice(5).trim());
+            if (m && m.ts > answerSeen && m.text){
+              stopThinking();
+              chatBubble('lumbung', m.text);
+              answerSeen = m.ts;
+            }
+          }catch(e){ /* a half-written line: the next frame carries it */ }
+        }
+      }
+    }
+  }catch(e){ /* fall through to the reconnect below */ }
+  answerStream = null;
+  if (TOKEN !== null) setTimeout(openAnswerStream, 3000);
+}
+
+document.addEventListener('visibilitychange', ()=>{
+  if (!document.hidden) openAnswerStream();
+});
+
+/* The queued text carries an instruction written for the reader, not for you.
+   Showing it raw turned the chat into a debug log. */
+function prettyAsked(t){
+  const m = /^\[FILE\]\s+(.+?)\s+—/.exec(t);
+  if (m) return 'Sent ' + m[1].split(/[\\/]/).pop();
+  return t;
+}
+
+/* Anything answered while the sheet was closed, or after the poller stopped
+   waiting, is already on disk. Reopening has to show it: the give-up message
+   promises exactly that, and a promise the code does not keep is worse than
+   saying nothing. */
+async function syncAnswers(){
+  try{
+    const d = await api('/api/chat/history');
+    (d.messages||[]).forEach(m => {
+      if (m.role === 'lumbung' && m.ts > answerSeen){
+        chatBubble('lumbung', m.text);
+        answerSeen = m.ts;
+      }
+    });
+  }catch(e){ /* offline: what is already on screen is still true */ }
+}
+
+async function loadChat(){
+  const log = document.getElementById('chatLog');
+  if (log.dataset.loaded){ syncAnswers(); return; }
+  try{
+    const d = await api('/api/chat/history');
+    (d.messages||[]).forEach(m => {
+      chatBubble(m.role, m.role === 'you' ? prettyAsked(m.text) : m.text);
+      if (m.role === 'lumbung') answerSeen = Math.max(answerSeen, m.ts);
+    });
+  }catch(e){ /* an empty history is not an error */ }
+  if (!log.children.length){
+    chatBubble('lumbung',
+      'Ask me anything about your money, or use a command.\n\n'
+      + 'You can also send a receipt photo or a PDF and I will tell you what '
+      + 'it is and where it belongs.');
+  }
+  log.dataset.loaded = '1';
+}
+
+/* --------------------------------------------------- install prompt */
+/* Chrome fires `beforeinstallprompt` only when the manifest, icons and a
+   service worker are all valid -- so the banner appearing at all is itself
+   evidence the PWA is installable. iOS never fires it and offers no API, so
+   there the only honest option is to show the manual steps. */
+let deferredInstall = null;
+
+function isInstalled(){
+  return matchMedia('(display-mode: standalone)').matches
+      || matchMedia('(display-mode: minimal-ui)').matches
+      || navigator.standalone === true;
+}
+
+function isIOS(){
+  return /iphone|ipad|ipod/i.test(navigator.userAgent)
+      || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+function showInstall(){
+  // Dismissal is remembered for a month, not forever: a banner you cannot get
+  // rid of is nagging, and one you can never see again is a feature you lost.
+  const until = +(localStorage.getItem('lb_install_dismissed') || 0);
+  if (isInstalled() || Date.now() < until) return;
+  if (!deferredInstall && !isIOS()) return;      // nothing useful to offer yet
+
+  if (isIOS()){
+    document.getElementById('installWhy').textContent =
+      'Tap Share, then "Add to Home Screen".';
+    document.getElementById('installGo').style.display = 'none';
+  }
+  document.getElementById('install').classList.add('on');
+}
+
+function dismissInstall(){
+  localStorage.setItem('lb_install_dismissed', Date.now() + 30*24*3600*1000);
+  document.getElementById('install').classList.remove('on');
+}
+
+async function doInstall(){
+  if (!deferredInstall) return dismissInstall();
+  document.getElementById('install').classList.remove('on');
+  deferredInstall.prompt();
+  const {outcome} = await deferredInstall.userChoice;
+  deferredInstall = null;
+  // Only remember a refusal. Accepting means it is installed and the banner
+  // will not qualify to show again anyway.
+  if (outcome !== 'accepted') dismissInstall();
+}
+
+addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();               // keep Chrome's own mini-infobar out of the way
+  deferredInstall = e;
+  showInstall();
+});
+addEventListener('appinstalled', () => {
+  document.getElementById('install').classList.remove('on');
+  localStorage.removeItem('lb_install_dismissed');
+});
+
+/* ------------------------------------------------------ swipe between tabs */
+/* Horizontal swipe moves between the nav tabs, the way a native app does.
+   Deliberately stricter than the pull-to-refresh gesture: it only fires when
+   the movement is clearly sideways, otherwise every diagonal scroll would
+   change tab and the app would feel possessed. */
+const TAB_ORDER = ['home', 'folio', 'bot', 'plan'];
+
+(function(){
+  let x0 = 0, y0 = 0, tracking = false;
+  const MIN_X = 60;        // far enough to be a swipe, not a tap wobble
+  const MAX_Y = 45;        // any more vertical drift and it was a scroll
+
+  addEventListener('touchstart', e => {
+    if (e.touches.length !== 1) { tracking = false; return; }
+    x0 = e.touches[0].clientX;
+    y0 = e.touches[0].clientY;
+    tracking = true;
+  }, {passive:true});
+
+  addEventListener('touchend', e => {
+    if (!tracking) return;
+    tracking = false;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - x0, dy = t.clientY - y0;
+    if (Math.abs(dx) < MIN_X || Math.abs(dy) > MAX_Y) return;
+
+    // Settings is reached from the gear and is not in the swipe order; from
+    // there a swipe returns you to where the tabs actually are.
+    const cur = localStorage.getItem('lb_tab') || 'home';
+    let i = TAB_ORDER.indexOf(cur);
+    if (i < 0) i = 0;
+    const next = TAB_ORDER[i + (dx < 0 ? 1 : -1)];
+    if (next) tab(next);
+  }, {passive:true});
+})();
+
+/* ------------------------------------------------ pull to refresh */
+async function refreshAll(){
+  const ptr = document.getElementById('ptr');
+  ptr.classList.add('spin');
+  ptr.style.height = '46px';
+  try{
+    await load();
+    await loadActions();
+    LAST_LOAD = Date.now();
+  }catch(e){ /* leave the last good numbers on screen rather than blanking them */ }
+  ptr.classList.remove('spin');
+  ptr.style.height = '0px';
+  stampAge();
+}
+
+/* The clock chip doubles as the refresh button, and as the honest answer to
+   "is this current?" -- a time with no age next to it looks fresh forever. */
+function stampAge(){
+  const el = document.getElementById('chipTime');
+  if (!LAST_LOAD) return;
+  const secs = Math.round((Date.now() - LAST_LOAD)/1000);
+  el.textContent = secs < 45 ? 'just now'
+                 : secs < 3600 ? Math.round(secs/60)+'m ago'
+                 : Math.round(secs/3600)+'h ago';
+  el.classList.toggle('stale', secs > 300);
+}
+setInterval(stampAge, 15000);
+document.getElementById('chipTime').addEventListener('click', refreshAll);
+
+(function(){
+  const ptr = document.getElementById('ptr');
+  const THRESHOLD = 70;          // far enough to be deliberate, not a stray swipe
+  let startY = 0, pulling = false;
+
+  addEventListener('touchstart', e => {
+    // Only from the very top, or the gesture fights normal scrolling.
+    pulling = window.scrollY <= 0;
+    startY = e.touches[0].clientY;
+  }, {passive:true});
+
+  addEventListener('touchmove', e => {
+    if (!pulling) return;
+    const dy = e.touches[0].clientY - startY;
+    if (dy <= 0){ pulling = false; ptr.style.height = '0px'; return; }
+    // Resistance, so it feels like pulling against something rather than
+    // dragging a free element.
+    ptr.style.height = Math.min(70, dy * 0.45) + 'px';
+    ptr.querySelector('.ring').style.transform = `rotate(${dy * 2}deg)`;
+  }, {passive:true});
+
+  addEventListener('touchend', () => {
+    if (!pulling) return;
+    const pulled = parseFloat(ptr.style.height) || 0;
+    pulling = false;
+    if (pulled >= THRESHOLD * 0.45) refreshAll();
+    else ptr.style.height = '0px';
+  });
+})();
+
+setInterval(()=>{ if (TOKEN && !document.hidden) refreshAll(); }, 60000);
+document.addEventListener('visibilitychange', ()=>{ if (!document.hidden && TOKEN) refreshAll(); });
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
+
+// What each category costs against what it should cost. The rows sum to the
+// spending figure on Home because the backend builds both from the same
+// tracked months and the same exclusions -- a category table that disagreed
+// with the headline would be the same class of bug this app keeps hitting.
+function renderCutPlan(d) {
+  const host = document.getElementById('cutPlan');
+  const note = document.getElementById('cutNote');
+  if (!host) return;
+  const rows = d.cut_plan || [];
+  if (!rows.length) {
+    host.innerHTML = '<div class="sub">Not enough complete months logged yet.</div>';
+    if (note) note.textContent = '';
+    return;
+  }
+  const totalNow = rows.reduce((a, r) => a + r.average, 0);
+  const totalCut = rows.reduce((a, r) => a + r.cut, 0);
+  const out = [];
+  for (const r of rows) {
+    const pace = r.target ? r.current / r.target : 0;
+    const cls = !r.target ? '' : (pace > 1 ? 'down' : 'up');
+    const right = r.target
+      ? `${rpS(r.average)} <span class="sub">&rarr;</span> ${rpS(r.target)}`
+      : rpS(r.average);
+    const sub = r.target
+      ? `cut ${rpS(r.cut)} &middot; this month ${rpS(r.current)} of ${rpS(r.target)}`
+      : 'no target set';
+    out.push(`<div class="row"><div class="l"><div class="name">${r.category}</div>
+        <div class="sub">${sub}</div></div>
+      <div class="r"><div class="name ${cls}">${right}</div></div></div>`);
+  }
+  host.innerHTML = out.join('');
+  if (note) {
+    note.innerHTML = totalCut > 0
+      ? `Hitting every target takes you from ${rpS(totalNow)} to `
+        + `<b>${rpS(totalNow - totalCut)}</b> a month &mdash; ${rpS(totalCut)} saved. `
+        + 'Set the targets under goals.spending_targets.'
+      : 'No targets set yet. Add goals.spending_targets to holdings.yaml and '
+        + 'this becomes a plan rather than a list.';
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,87 @@
+# Screening universe for `lumbung recommend`.
+# Liquid IDX names across sectors: LQ45 constituents, the usual IDX High Dividend
+# 20 members, and liquid mid-caps. Deliberately spread across sectors so the
+# screener can offer something that is NOT another bank.
+universe:
+  # --- banks & financials (you are already heavily exposed here via BBCA) ---
+  - BBCA.JK
+  - BBRI.JK
+  - BMRI.JK
+  - BBNI.JK
+  - BRIS.JK
+  - BJBR.JK
+  - BJTM.JK
+  - BFIN.JK
+  - PNLF.JK
+  - BTPS.JK
+
+  # --- telco & towers ---
+  - TLKM.JK
+  - EXCL.JK
+  - ISAT.JK
+  - TOWR.JK
+  - MTEL.JK
+
+  # --- consumer staples & retail ---
+  - UNVR.JK
+  - ICBP.JK
+  - INDF.JK
+  - MYOR.JK
+  - SIDO.JK
+  - AMRT.JK
+  - MAPI.JK
+  - ACES.JK
+  - ERAA.JK
+  - HMSP.JK
+  - GGRM.JK
+  - CPIN.JK
+  - JPFA.JK
+
+  # --- energy, mining & metals ---
+  - ADRO.JK
+  - PTBA.JK
+  - ITMG.JK
+  - HRUM.JK
+  - GEMS.JK
+  - INCO.JK
+  - ANTM.JK
+  - TINS.JK
+  - MDKA.JK
+  - MBMA.JK
+  - MEDC.JK
+  - PGAS.JK
+  - ELSA.JK
+  - AKRA.JK
+
+  # --- plantations ---
+  - AALI.JK
+  - LSIP.JK
+  - TAPG.JK
+  - DSNG.JK
+
+  # --- industrials, cement & infrastructure ---
+  - ASII.JK
+  - UNTR.JK
+  - SMGR.JK
+  - INTP.JK
+  - JSMR.JK
+  - BIRD.JK
+  - SMSM.JK
+
+  # --- property ---
+  - BSDE.JK
+  - CTRA.JK
+  - PWON.JK
+  - SMRA.JK
+
+  # --- healthcare ---
+  - KLBF.JK
+  - MIKA.JK
+  - SILO.JK
+  - PRDA.JK
+
+  # --- pulp, paper & chemicals ---
+  - INKP.JK
+  - TKIM.JK
+  - TPIA.JK
+  - ESSA.JK

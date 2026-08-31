@@ -1,0 +1,16 @@
+# Cloudflared tunnel config.
+# After `cloudflared tunnel create lumbung`, copy this to
+#   %USERPROFILE%\.cloudflared\config.yml
+# and replace <TUNNEL-UUID> and <YOUR-DOMAIN>.
+
+tunnel: <TUNNEL-UUID>
+credentials-file: C:\Users\akbar\.cloudflared\<TUNNEL-UUID>.json
+
+ingress:
+  - hostname: lumbung.<YOUR-DOMAIN>
+    service: http://localhost:8788
+    originRequest:
+      # The dashboard is plain HTTP on localhost; Cloudflare terminates TLS.
+      noTLSVerify: true
+  # Every tunnel needs a catch-all, and it must be last.
+  - service: http_status:404

@@ -1,0 +1,56 @@
+# Indonesian retail government bonds (SBN Ritel).
+#
+# There is no public API for the offering calendar, so this file is the source
+# of truth. Update it when a new series opens -- `lumbung bonds` will tell you
+# when the list has gone stale.
+#
+# kind:
+#   SR  Sukuk Ritel      - sharia, fixed coupon, TRADEABLE on the secondary market
+#   ORI Obligasi Ritel   - conventional, fixed coupon, tradeable
+#   ST  Sukuk Tabungan   - sharia, floating, NOT tradeable, early redemption only
+#   SBR Savings Bond     - conventional, floating, NOT tradeable, early redemption
+#
+# coupon is the gross annual rate. Tax is applied by the tool: SBN coupons are
+# taxed at 10% final, against 20% on deposit and savings interest -- which is
+# why a 6.8% bond beats a 6% savings account by more than the headline suggests.
+
+offerings:
+  - series: "SR025T3"
+    kind: SR
+    tenor_years: 3
+    coupon: 0.0680
+    opens: "2026-08-21"
+    closes: "2026-09-16"
+    matures: "2029-09-10"
+    min_idr: 1_000_000
+    tradeable: true
+    note: "Fixed 6.80%, paid the 10th monthly; first payment 10 Oct 2026"
+
+  - series: "SR025T5"
+    kind: SR
+    tenor_years: 5
+    coupon: 0.0690
+    opens: "2026-08-21"
+    closes: "2026-09-16"
+    matures: "2031-09-10"
+    min_idr: 1_000_000
+    tradeable: true
+    note: "Fixed 6.90%, paid the 10th monthly; first payment 10 Oct 2026"
+
+# What you are choosing between. Rates as of 2026-08; edit if yours differ.
+alternatives:
+  - name: "Superbank Tabungan Utama"
+    rate: 0.0600
+    liquid: true
+    taxed: deposit          # 20% on interest above a Rp 7.5jt balance
+    note: "instant access"
+  - name: "Superbank deposito 1-12mo"
+    rate: 0.0750
+    liquid: false
+    taxed: deposit
+    note: "locked for the tenor"
+  - name: "Bank Indonesia rate"
+    rate: 0.0575
+    liquid: false
+    taxed: none
+    note: "reference only, not investable"

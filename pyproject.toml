@@ -1,0 +1,58 @@
+[project]
+name = "lumbung"
+version = "0.1.0"
+description = "Lumbung - patient wealth agent: automated Indodax crypto trading, IDX stock signals, and portfolio planning"
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.27",
+    "pandas>=2.2",
+    "numpy>=1.26",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "pyyaml>=6.0",
+    "typer>=0.12",
+    "rich>=13.7",
+    "yfinance>=0.2.40",
+    "tenacity>=8.3",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "ruamel-yaml>=0.18",
+    "pyjwt[crypto]>=2.8",
+    "python-multipart>=0.0.32",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2",
+    "pytest-asyncio>=0.23",
+    "respx>=0.21",
+    "ruff>=0.5",
+]
+
+[project.scripts]
+lumbung = "lumbung.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/lumbung"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = [
+    "E501",
+    # Typer defines CLI parameters via calls in argument defaults.
+    # This is the framework's documented contract, not a mutable-default bug.
+    "B008",
+]

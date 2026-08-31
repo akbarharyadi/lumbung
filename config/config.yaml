@@ -1,0 +1,138 @@
+# Lumbung configuration
+# All money values are in IDR (Rupiah). All times are Asia/Jakarta (WIB).
+
+# ---------------------------------------------------------------- capital
+capital:
+  # The amount the bot is allowed to trade. This is NOT your account balance --
+  # it is the sleeve you consciously put at risk. Follow the rollout ladder:
+  #   paper -> 500_000 (1 pair) -> 3_000_000 -> 6_000_000 -> 10_000_000
+  sleeve_idr: 2_990_000   # matches the Rp 2,996,670 actually on Indodax
+
+# ---------------------------------------------------------------- universe
+universe:
+  # Only high-liquidity IDR pairs. Illiquid alts have spreads that eat the edge.
+  # Liquid IDR pairs with >= 2.5 years of 4h history (checked 2026-08-23 against
+  # /api/summaries volume + history_v2 depth). Stablecoins are excluded -- they
+  # do not trend. xaut_idr is excluded as a duplicate of paxg_idr (both gold).
+  pairs:
+    - btc_idr
+    - eth_idr
+    - xrp_idr
+    - sol_idr
+    - doge_idr
+    - ada_idr
+    - bnb_idr
+    - trx_idr
+    - hbar_idr
+    - sui_idr
+    - ondo_idr
+    - pepe_idr
+    - shib_idr
+    - paxg_idr
+  timeframe: "240"       # 4h. Indodax tf: 1, 15, 30, 60, 240, 1D, 3D, 1W
+                         # 1h was tested and loses: a 2.5xATR stop there is ~1.2%
+                         # while round-trip costs are ~0.5%, so costs eat 40% of
+                         # every risk unit. 4h widens the stop and cuts churn.
+
+# ---------------------------------------------------------------- strategy
+# Values below are the outcome of a walk-forward sweep over 4 years of 4h data
+# across 14 pairs (scripts/sweep.py, scripts/sweep_risk.py). They sit on a broad
+# plateau -- neighbouring settings perform similarly -- rather than on a single
+# lucky cell, which is what makes them worth trusting out of sample.
+strategy:
+  name: donchian_trend
+  donchian_lookback: 55   # bars for the breakout high (55 * 4h ~= 9 days)
+  ema_fast: 50
+  ema_slow: 200
+  adx_period: 14
+  adx_min: 25.0           # the single highest-value filter in the sweep
+  atr_period: 14
+  stop_atr_mult: 4.0      # initial stop = entry - 4.0 * ATR
+  trail_atr_mult: 4.5     # chandelier trail = highest_close - 4.5 * ATR
+  # Partial take-profit is DISABLED (999 = unreachable). Tested both ways: taking
+  # half off at +1.5R turned a +22.8% out-of-sample run into +16.6%. Trend
+  # following earns everything from a handful of huge winners, so capping them
+  # removes the only source of profit.
+  partial_tp_r: 999.0
+  partial_tp_frac: 0.5
+
+# ---------------------------------------------------------------- risk gates
+# Every one of these is a hard block. There is no override flag.
+risk:
+  risk_per_trade_pct: 0.01        # 1% of sleeve risked per trade
+  max_position_pct: 0.25          # one position may not exceed 25% of sleeve
+  max_concurrent_positions: 6     # 14 pairs need more slots than 3 to diversify
+  max_total_exposure_pct: 0.75
+  daily_loss_limit_pct: 0.03      # -3% in a day -> no new entries until 00:00 WIB
+                                  # (never binding in the backtest -- a free net)
+  # 20%, NOT 10%. The strategy's own worst historical drawdown is 17.4% and it
+  # spends 53% of its life more than 5% below peak: drawdown is its normal
+  # operating state, not an emergency. A 10% halt fired within 9-12 months in
+  # every backtest and killed the strategy before its payoff months arrived.
+  # 20% clears the historical worst with margin and still caps the damage.
+  # Resuming after a halt is a human decision and rebases the equity peak --
+  # see resume_after_halt() in risk.py.
+  max_drawdown_pct: 0.20
+  min_notional_idr: 50_000        # our floor; exchange minimum is only Rp 10.000
+                                  # (trade_min_base_currency). Keep ours higher so a
+                                  # position is meaningful relative to fixed costs.
+
+# ---------------------------------------------------------------- costs
+# Backtest and live must use the SAME numbers or the backtest is a lie.
+costs:
+  # VERIFIED from live /api/pairs metadata on 2026-08-23 for all universe pairs:
+  #   trade_fee_percent_maker = 0.1, trade_fee_percent_taker = 0.2
+  # The Indodax help-centre article claims 0% maker / 0.3% taker -- it disagrees
+  # with the API, so we trust the API and reconcile against real fills with
+  # `lumbung verify-costs` once live.
+  maker_fee_pct: 0.001      # 0.10% -- post-only entries and exits
+  taker_fee_pct: 0.002      # 0.20% -- market orders (stop-loss exits)
+  sell_tax_pct: 0.0021      # PPh final 0.21% on every sell (PMK 50/2025)
+  safety_margin_pct: 0.0005 # extra per-side buffer so the backtest under-promises
+  slippage_ticks: 1         # assume 1 price increment of slippage
+  taker_spread_pct: 0.0025  # half-spread paid when a market order crosses the book
+  # => post-only round trip ~= 0.10 + 0.10 + 0.21 + buffer ~= 0.51%
+  # => stop-loss round trip ~= 0.10 + 0.20 + 0.21 + spread + buffer ~= 0.86%
+
+# ---------------------------------------------------------------- execution
+execution:
+  poll_interval_sec: 20        # main loop cadence
+  entry_chase_max: 3           # re-quote attempts for a post-only entry
+  entry_chase_wait_sec: 60     # wait this long for a fill before re-quoting
+  entry_max_slip_pct: 0.003    # abandon entry if price ran >0.3% past the signal
+  exit_timeout_sec: 900        # a post-only exit unfilled this long escalates to market
+  heartbeat_stale_sec: 300     # alert if the engine loop stalls this long
+
+# ---------------------------------------------------------------- stocks
+stocks:
+  enabled: true
+  budget_idr: 2_000_000        # notional used to suggest lot counts (manual execution)
+  run_at_wib: "16:15"          # after IDX close
+  donchian_lookback: 20        # daily bars
+  ema_fast: 50
+  ema_slow: 200
+  adx_min: 20.0
+  atr_period: 14
+  stop_atr_mult: 2.0
+  tp_atr_mult: 4.0
+  fee_buy_pct: 0.0015          # ~0.15% typical IDX buy fee
+  fee_sell_pct: 0.0025         # ~0.25% sell fee incl. 0.1% PPh final
+  # Final PPh on dividends. 0.10 is the normal case; set 0.0 if you elect
+  # the reinvestment exemption (reinvested in Indonesia for 3 years).
+  # Every other income figure here is net, so this one must be too.
+  dividend_tax_pct: 0.10
+
+# ---------------------------------------------------------------- news
+# Screens headlines for your holdings and flags material corporate events.
+# Advisory only -- it never places an order and is never used as a signal.
+# Without OPENROUTER_API_KEY it still works, using keyword flagging.
+news:
+  enabled: true
+  days: 7
+  model: "anthropic/claude-3.5-haiku"
+
+# ---------------------------------------------------------------- paths
+paths:
+  db: "data/lumbung.db"
+  halt_file: "HALT"
+  log_dir: "logs"

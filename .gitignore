@@ -1,0 +1,35 @@
+# --- secrets -----------------------------------------------------------------
+# Every .env variant, including dated backups. .env.example is the only one kept.
+.env
+.env.*
+!.env.example
+
+# --- personal data -----------------------------------------------------------
+# Holdings, net worth, chat history, receipts, bank statements, home IP.
+data/
+logs/
+config/holdings.yaml
+config/*.bak
+*.db
+*.db-journal
+*.sqlite3
+*.parquet
+HALT
+
+# --- local tooling -----------------------------------------------------------
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+.gstack/
+.claude/
+
+# Vendored binary — download from cloudflare/cloudflared releases instead.
+tools/cloudflared.exe
+
+# Editor/AI scratch copies
+*.bak

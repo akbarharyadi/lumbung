@@ -1,0 +1,24 @@
+# IDX watchlist for SIGNAL-ONLY alerts.
+# The bot NEVER places a stock order -- it tells you what to type into
+# Stockbit's Auto Order. Tickers use the Yahoo Finance ".JK" suffix.
+watchlist:
+  - BBCA.JK   # Bank Central Asia
+  - BBRI.JK   # Bank Rakyat Indonesia
+  - BMRI.JK   # Bank Mandiri
+  - BBNI.JK   # Bank Negara Indonesia
+  - TLKM.JK   # Telkom Indonesia
+  - ASII.JK   # Astra International
+  - UNTR.JK   # United Tractors
+  - ADRO.JK   # Adaro Energy
+  - ANTM.JK   # Aneka Tambang
+  - INDF.JK   # Indofood
+  - ICBP.JK   # Indofood CBP
+  - KLBF.JK   # Kalbe Farma
+  - INKP.JK   # Indah Kiat Pulp & Paper
+  - PGAS.JK   # Perusahaan Gas Negara
+  - PTBA.JK   # Bukit Asam
+  - SMGR.JK   # Semen Indonesia
+  - MDKA.JK   # Merdeka Copper Gold
+  - AMRT.JK   # Sumber Alfaria Trijaya
+  - CPIN.JK   # Charoen Pokphand Indonesia
+  - EXCL.JK   # XL Axiata
