@@ -33,3 +33,6 @@ tools/cloudflared.exe
 
 # Editor/AI scratch copies
 *.bak
+
+# Private deploy/server details (addresses, users, keys).
+*.local.md
