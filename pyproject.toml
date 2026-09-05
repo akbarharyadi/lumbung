@@ -19,6 +19,8 @@ dependencies = [
     "ruamel-yaml>=0.18",
     "pyjwt[crypto]>=2.8",
     "python-multipart>=0.0.32",
+    "pypdfium2>=4",
+    "pillow>=10",
 ]
 
 [project.optional-dependencies]

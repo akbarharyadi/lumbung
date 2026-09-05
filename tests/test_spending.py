@@ -330,3 +330,34 @@ def test_a_target_above_what_you_spend_is_not_headroom(tmp_path):
     assert plan[0]["cut"] == 0.0
     assert plan[0]["has_target"] is True
     conn.close()
+
+# -- statement reconciliation -------------------------------------------------
+def test_reconcile_statement_dedupes_and_splits_flows(tmp_path):
+    import time as time_mod
+
+    from lumbung.spending import connect, reconcile_statement, record
+
+    conn = connect(tmp_path / "t.db")
+    aug3 = int(time_mod.mktime((2026, 8, 3, 0, 0, 0, 0, 0, -1)))
+    record(conn, amount=45_000, item="Kopi Kenangan", category="food", ts=aug3)
+
+    res = reconcile_statement(conn, [
+        {"date": "2026-08-03", "amount": -45_000, "item": "Kopi Kenangan",
+         "category": "food"},                     # already logged -> skipped
+        {"date": "2026-08-04", "amount": -17_000, "item": "Biaya Admin BCA",
+         "category": "fees"},                     # new expense
+        {"date": "2026-08-05", "amount": 2_000_000, "item": "Transfer Masuk",
+         "category": "other"},                    # credit -> income
+        {"date": "not-a-date", "amount": 1, "item": "x"},  # unreadable
+    ], note="statement AGU")
+    assert len(res["recorded"]) == 2
+    assert res["skipped"] == [{"item": "Kopi Kenangan", "amount": 45_000}]
+    assert len(res["failed"]) == 1
+    exp = recent(conn, days=400)
+    assert any(r["item"] == "Biaya Admin BCA" and r["method"] == "statement"
+               for r in exp)
+    inc = conn.execute("SELECT amount,source FROM income WHERE source='Transfer Masuk'").fetchall()
+    assert inc and inc[0][0] == 2_000_000
+    # the recorded expense carries the STATEMENT's date, not today's
+    admin = next(r for r in exp if r["item"] == "Biaya Admin BCA")
+    assert time_mod.strftime("%Y-%m-%d", time_mod.localtime(admin["ts"])) == "2026-08-04"

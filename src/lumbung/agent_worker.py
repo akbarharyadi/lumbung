@@ -115,6 +115,54 @@ def capture_intent(question: str) -> str:
 
 # [FILE] <path> — <instruction>: an upload from the app. The instruction text
 # is written for the answerer, not for him.
+# Upload rows arrive in two shapes: the old single-file "[FILE] <path> —
+# instruction" and the app's current "[FILES N] <instruction>\n<path>\n<path>".
+# Both must route to the attachment reader, or the message is answered as if
+# it were plain text and the upload is silently wasted.
+_UPLOAD_ROW = re.compile(r"^\s*\[FILES?\s*\d*\]")
+
+
+def _is_upload_row(text: str) -> bool:
+    return bool(_UPLOAD_ROW.match(text))
+
+
+def _looks_like_path(ln: str) -> bool:
+    """POSIX absolute, a Windows drive path, or a slash-y relative path
+    ('data/uploads/x.png'). A caption with spaces never matches, so his
+    words stay words."""
+    if ln.startswith("/") or re.match(r"^[A-Za-z]:[\\/]", ln):
+        return True
+    return "/" in ln and " " not in ln
+
+
+def _parse_upload_row(text: str) -> tuple[list[Path], str]:
+    """Attachment rows -> (paths, his instruction). Paths are the lines that
+    start with '/'; everything else is what he wrote about them. The old
+    single-file shape kept 'path — instruction' on ONE line."""
+    body = _UPLOAD_ROW.sub("", text, count=1).strip()
+    paths: list[Path] = []
+    words: list[str] = []
+    for ln in body.splitlines():
+        ln = ln.strip()
+        if not ln:
+            continue
+        if _looks_like_path(ln):
+            # old shape: "/path/to file.png — caption" on one line
+            path_part, sep, note = ln.partition(" — ")
+            paths.append(Path(path_part))
+            if sep and note:
+                words.append(note)
+        else:
+            words.append(ln)
+    # old shape without the dash: "[FILE] /x/a.png caption..."
+    if not paths and words and ("/" in words[0] or "\\" in words[0]
+                                or re.match(r"^[A-Za-z]:", words[0])):
+        parts = words[0].split(None, 1)
+        paths.append(Path(parts[0]))
+        words = ([parts[1]] if len(parts) > 1 else []) + words[1:]
+    return paths, " ".join(words).strip()
+
+
 _FILE_PREFIX = "[FILE]"
 
 
@@ -296,7 +344,93 @@ def execute_run_lines(cfg: Config, answer: str) -> str:
     return "\n".join(out)
 
 
+_TX_LINE = re.compile(
+    r"^\s*(\d{4}-\d{2}-\d{2})\s*\|\s*(-?[\d.,]+)\s*\|\s*([^|]+?)\s*(?:\|\s*(\w+)\s*)?$"
+)
+
+
+def execute_transactions_block(cfg: Config, answer: str, note: str) -> str:
+    """The TRANSACTIONS block is the statement write path: the model only
+    transcribes what the statement shows; deterministic code validates,
+    dedupes against the ledger and records what is genuinely new."""
+    from .spending import CATEGORIES, connect, reconcile_statement
+    from .web.settings import _number
+
+    if "TRANSACTIONS:" not in answer:
+        return answer
+    rows: list[dict] = []
+    out: list[str] = []
+    in_block = False
+    for line in answer.splitlines():
+        t = line.strip()
+        if t == "TRANSACTIONS:":
+            in_block = True
+            continue
+        if in_block:
+            m = _TX_LINE.match(line)
+            if m:
+                date_s, amount_s, item, cat = m.groups()
+                try:
+                    amount = float(_number(amount_s))
+                except Exception:  # noqa: BLE001
+                    amount = 0.0
+                category = (cat or "other").lower()
+                if category not in CATEGORIES:
+                    category = "other"
+                rows.append({"date": date_s, "amount": amount,
+                             "item": item, "category": category})
+                continue
+            if not t:
+                continue
+            in_block = False
+            out.append(line)
+            continue
+        out.append(line)
+    if not rows:
+        return answer
+    note = note.strip()[:120] or "statement"
+    try:
+        res = reconcile_statement(connect(cfg.db_path), rows, note=note)
+    except Exception as exc:  # noqa: BLE001 -- a failed batch must not eat the answer
+        log.warning("reconcile failed: %s", exc)
+        return answer + "\n\n⚠️ Rekonsiliasi gagal: " + str(exc)
+    total = f"Rp {res['recorded_total']:,.0f}".replace(",", ".")
+    parts = [f"✅ Rekonsiliasi: {len(res['recorded'])} transaksi dicatat "
+             f"(total {total})"]
+    if res["skipped"]:
+        parts.append(f"{len(res['skipped'])} sudah ada di buku — dilewati: "
+                     + ", ".join(s["item"] for s in res["skipped"][:5]))
+    if res["failed"]:
+        parts.append(f"{len(res['failed'])} baris gagal dibaca")
+    out.append("\n".join(parts))
+    return "\n".join(out)
+
+
 # ----------------------------------------------------------------- receipts
+def _render_pdf_pages(pdf: Path, out_dir: Path, max_pages: int = 8) -> list[Path]:
+    """PDFs cannot reach the model directly -- the provider drops the
+    attachment -- but page images read fine. Rendered deterministically,
+    capped, into uploads/_render/."""
+    try:
+        import pypdfium2 as pdfium
+    except ImportError:
+        log.warning("pypdfium2 missing: cannot render %s", pdf.name)
+        return []
+    out_dir.mkdir(parents=True, exist_ok=True)
+    pages: list[Path] = []
+    try:
+        doc = pdfium.PdfDocument(str(pdf))
+        for i in range(min(len(doc), max_pages)):
+            img = doc[i].render(scale=2.0).to_pil()
+            out = out_dir / f"{pdf.stem}-p{i + 1}.png"
+            img.save(out)
+            pages.append(out)
+    except Exception as exc:  # noqa: BLE001 -- a broken pdf must not kill the turn
+        log.warning("pdf render failed for %s: %s", pdf.name, exc)
+        return []
+    return pages
+
+
 def answer_file_upload(
     server: OpenCodeServer,
     cfg: Config,
@@ -307,25 +441,50 @@ def answer_file_upload(
     on_form=None,
     history_since: int = 0,
 ) -> tuple[str, str]:
-    """A photo/PDF from the app. The chat session runs inside data/uploads,
-    so the model's Read tool can open the attachment itself -- GLM reads
-    images -- and nothing outside that folder is reachable. No OCR service,
-    no LOCAL_LLM: the one model both sees and explains."""
-    m = re.match(r"\[FILE\]\s+(\S+)(?:\s+—\s*(.+))?", str(row.get("text", "")))
-    path = Path(m.group(1)) if m else None
-    instruction = (m.group(2) or "").strip() if m else ""
-    if path is None or not path.exists():
-        return ("Lampiran tidak ditemukan di penyimpanan. Kirim ulang, atau "
-                "tulis angkanya sebagai teks."), session_id
+    """One or more files from the app. The chat session runs inside
+    data/uploads, so the model's Read tool can open the attachments itself
+    -- GLM reads images -- and nothing outside that folder is reachable. No
+    OCR service, no LOCAL_LLM: the one model both sees and explains."""
+    paths, instruction = _parse_upload_row(str(row.get("text", "")))
+    existing = [p for p in paths if p.exists()]
+    if not existing:
+        if paths:
+            return ("Lampiran tidak ditemukan di penyimpanan. Kirim ulang, "
+                    "atau tulis angkanya sebagai teks."), session_id
+        return ("Lampiran tidak jelas. Kirim ulang filenya, atau tulis "
+                "maksudnya sebagai teks."), session_id
 
+    # PDFs: the provider drops the attachment, so pages are pre-rendered to
+    # PNG (which GLM reads) before anything is listed.
+    from .spending import CATEGORIES
+
+    readable: list[Path] = []
+    for p in existing:
+        if p.suffix.lower() == ".pdf":
+            pages = _render_pdf_pages(p, p.parent / "_render")
+            readable.extend(pages or [p])   # fall back to the raw path: the
+        else:                               # honest failure is still an answer
+            readable.append(p)
+
+    listing = "\n".join(f"- {p.name}" for p in readable)
     prompt = (
-        "ATTACHMENT: he sent a file from the app. It is in the current "
-        f"directory -- open it with the Read tool: {path.name}\n"
+        f"ATTACHMENT{'S' if len(readable) > 1 else ''}: he sent "
+        f"{len(readable)} file(s) from the app. They are in the current "
+        "directory -- open each with the Read tool:\n"
+        f"{listing}\n"
         + (f"HIS INSTRUCTION: {instruction}\n" if instruction else
-           "Say what it shows: merchant, amount, date, whatever is "
+           "Say what each shows: merchant, amount, date, whatever is "
            "legible.\n")
+        + "If a file is an account statement and he asked to record or "
+          "reconcile it: after reading, end with a block that starts with "
+          "TRANSACTIONS: and then one line per transaction, exactly:\n"
+          "YYYY-MM-DD | amount | merchant | category\n"
+          "amount NEGATIVE for money out (debits), POSITIVE for money in "
+          f"(credits). Categories allowed: {', '.join(CATEGORIES)}. The "
+          "system records them, skips what is already logged, and appends "
+          "the real outcome -- never claim they are recorded yourself.\n"
         + "Then answer as Lumbung, short. Do not record anything yourself "
-          "-- if it is a receipt, tell him he can log it with /spend."
+          "outside that block."
     )
     answer, session_id = server.ask(
         prompt, session_dir=session_dir, session_id=session_id,
@@ -479,10 +638,11 @@ def run_worker(*, once: bool = False, cfg: Config | None = None,
             write_chat_answer(d, q, question=str(row.get("text", "")))
 
         try:
-            if str(row.get("text", "")).startswith(_FILE_PREFIX):
+            if _is_upload_row(str(row.get("text", ""))):
                 answer, chat_sid = answer_file_upload(
                     server, cfg, row,
-                    session_dir=uploads_dir, session_id=chat_sid)
+                    session_dir=uploads_dir, session_id=chat_sid,
+                    on_form=on_form)
             else:
                 answer, chat_sid = answer_chat_question(
                     server, cfg, row,
@@ -502,6 +662,9 @@ def run_worker(*, once: bool = False, cfg: Config | None = None,
                     return
             log.info("chat answered %r -> %d chars",
                      str(row.get("text", ""))[:40], len(answer))
+            if _is_upload_row(str(row.get("text", ""))):
+                answer = execute_transactions_block(
+                    cfg, answer, note=str(row.get("text", "")))
             answer = execute_run_lines(cfg, answer)
             write_chat_answer(d, answer, question=str(row.get("text", "")))
         except Exception as exc:  # noqa: BLE001 -- one bad question only

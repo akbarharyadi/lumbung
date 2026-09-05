@@ -25,6 +25,7 @@ from __future__ import annotations
 import sqlite3
 import time
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 
 # Bank Indonesia ceiling. A card charging revolving interest costs this much.
@@ -248,23 +249,102 @@ def connect(db_path: str | Path) -> sqlite3.Connection:
 def record(
     conn: sqlite3.Connection, *, amount: float, item: str,
     category: str = "other", method: str = "cash", note: str = "",
+    ts: int | None = None,
 ) -> int:
     cur = conn.execute(
         "INSERT INTO expenses(ts,amount,item,category,method,note) VALUES(?,?,?,?,?,?)",
-        (int(time.time()), amount, item, category.lower(), method.lower(), note),
+        (int(ts) if ts else int(time.time()), amount, item,
+         category.lower(), method.lower(), note),
     )
     conn.commit()
     return int(cur.lastrowid or 0)
+
+
+def reconcile_statement(
+    conn: sqlite3.Connection,
+    rows: list[dict],
+    *,
+    note: str = "",
+) -> dict:
+    """Record a month of bank-statement transactions, skipping what is
+    already logged.
+
+    `rows` come from a statement the model read -- each {"date": "YYYY-MM-DD",
+    "amount": float, "item": str, "category": str}, amount NEGATIVE for money
+    out and POSITIVE for money in. A row is skipped as already-logged when
+    the same magnitude sits within 3 days of the statement date with a
+    matching item/source. Rules decide; the model only transcribed.
+    """
+    recorded: list[dict] = []
+    skipped: list[dict] = []
+    failed: list[dict] = []
+    known_exp = conn.execute("SELECT ts,amount,item FROM expenses").fetchall()
+    known_inc = conn.execute("SELECT ts,amount,source FROM income").fetchall()
+    for r in rows:
+        try:
+            day = date.fromisoformat(str(r.get("date", "")).strip())
+            amount = float(r.get("amount") or 0)
+        except (ValueError, TypeError):
+            failed.append({"row": r, "why": "unreadable date/amount"})
+            continue
+        if amount == 0:
+            failed.append({"row": r, "why": "amount is zero"})
+            continue
+        item = str(r.get("item") or "unknown").strip()[:80]
+        outflow = amount < 0
+        magnitude = abs(amount)
+        category = str(r.get("category") or "other").lower()
+        if category not in CATEGORIES:
+            category = "other"
+        ts = int(time.mktime(day.timetuple()))
+        a = item.casefold()
+        if outflow:
+            dup = next((k for k in known_exp
+                        if abs(float(k["amount"]) - magnitude) <= 1
+                        and abs(int(k["ts"]) - ts) <= 3 * 86400
+                        and (a in str(k["item"]).casefold()
+                             or str(k["item"]).casefold() in a)), None)
+            if dup is not None:
+                skipped.append({"item": item, "amount": magnitude})
+                continue
+            record(conn, amount=magnitude, item=item, category=category,
+                   method="statement", note=note, ts=ts)
+            known_exp.append(conn.execute(
+                "SELECT ts,amount,item FROM expenses WHERE ts=?", (ts,)
+            ).fetchone())
+        else:
+            dup = next((k for k in known_inc
+                        if abs(float(k["amount"]) - magnitude) <= 1
+                        and abs(int(k["ts"]) - ts) <= 3 * 86400
+                        and (a in str(k["source"]).casefold()
+                             or str(k["source"]).casefold() in a)), None)
+            if dup is not None:
+                skipped.append({"item": item, "amount": magnitude})
+                continue
+            record_income(conn, amount=magnitude, source=item,
+                          kind="other", note=note, ts=ts)
+            known_inc.append(conn.execute(
+                "SELECT ts,amount,source FROM income WHERE ts=?", (ts,)
+            ).fetchone())
+        recorded.append({"item": item, "amount": magnitude,
+                         "date": day.isoformat()})
+    return {
+        "recorded": recorded,
+        "skipped": skipped,
+        "failed": failed,
+        "recorded_total": sum(r["amount"] for r in recorded),
+    }
 
 
 # -- income ------------------------------------------------------------------
 def record_income(
     conn: sqlite3.Connection, *, amount: float, source: str,
     kind: str = "other", note: str = "",
+    ts: int | None = None,
 ) -> int:
     cur = conn.execute(
         "INSERT INTO income(ts,amount,source,kind,note) VALUES(?,?,?,?,?)",
-        (int(time.time()), amount, source, kind.lower(), note),
+        (int(ts) if ts else int(time.time()), amount, source, kind.lower(), note),
     )
     conn.commit()
     return int(cur.lastrowid or 0)

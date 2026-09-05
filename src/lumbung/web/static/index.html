@@ -1829,8 +1829,23 @@ document.addEventListener('visibilitychange', ()=>{
 /* The queued text carries an instruction written for the reader, not for you.
    Showing it raw turned the chat into a debug log. */
 function prettyAsked(t){
-  const m = /^\[FILE\]\s+(.+?)\s+—/.exec(t);
+  let m = /^\[FILE\]\s+(.+?)\s+—/.exec(t);
   if (m) return 'Sent ' + m[1].split(/[\\/]/).pop();
+  m = /^\[FILES?\s*\d*\]\s*([\s\S]*)$/.exec(t);
+  if (m){
+    const lines = m[1].split('\n');
+    const cap = lines.filter(l => l.trim() && !l.trim().startsWith('/'))
+      .join(' ').trim();
+    const names = lines.filter(l => l.trim().startsWith('/'))
+      .map(l => l.trim().split(/[\\/]/).pop());
+    const what = names.length
+      ? 'Sent ' + (names.length > 2
+          ? names.slice(0, 2).join(', ') + ` +${names.length - 2}`
+          : names.join(', '))
+      : '';
+    return (what && cap ? what + ' — ' + cap
+            : (what || cap || t));
+  }
   return t;
 }
 

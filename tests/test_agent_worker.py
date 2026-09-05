@@ -248,6 +248,48 @@ def test_file_upload_asks_model_to_read_attachment(cfg):
     assert sid == "s1"
 
 
+def test_file_upload_parses_the_app_files_format(cfg):
+    """The app queues '[FILES N] <instruction>\\n<path>' -- plural tag, the
+    instruction and the paths on separate lines. This shape must route to
+    the reader too, or the upload is answered as if it were plain text."""
+    up = cfg.data_dir / "uploads"
+    up.mkdir(parents=True, exist_ok=True)
+    p1 = up / "a.pdf"
+    p2 = up / "b.pdf"
+    p1.write_bytes(b"pdf")
+    p2.write_bytes(b"pdf")
+    seen = {}
+
+    class _S:
+        def ask(self, prompt, *, session_dir, session_id="", on_form=None,
+                **kw):
+            seen["prompt"] = prompt
+            return "Dua file, kubahaca.", "s2"
+
+    answer, _ = answer_file_upload(
+        _S(), cfg,
+        {"text": f"[FILES 2] baca dua-duanya\n{p1}\n{p2}"},
+        session_dir=up, session_id="",
+    )
+    assert "kubahaca" in answer
+    assert "a.pdf" in seen["prompt"] and "b.pdf" in seen["prompt"]
+
+
+def test_is_upload_row_matches_both_shapes():
+    from lumbung.agent_worker import _is_upload_row, _parse_upload_row
+    assert _is_upload_row("[FILE] /x/a.png — baca")
+    assert _is_upload_row("[FILES 1] baca ini\n/x/a.pdf")
+    assert _is_upload_row("[FILES] baca ini\n/x/a.pdf")
+    assert not _is_upload_row("berapa saldo saya?")
+    # old single-line shape: path — instruction, windows or posix
+    paths, instr = _parse_upload_row("[FILE] C:\\up\\r.png — baca ini")
+    assert [p.name for p in paths] == ["r.png"]
+    assert instr == "baca ini"
+    paths, instr = _parse_upload_row("[FILES 1] Ini statement kemarin\n/x/a.pdf")
+    assert [p.name for p in paths] == ["a.pdf"]
+    assert instr == "Ini statement kemarin"
+
+
 # ----------------------------------------------------------------- research
 
 
