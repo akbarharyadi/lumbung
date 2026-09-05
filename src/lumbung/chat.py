@@ -358,6 +358,7 @@ def build_commands(cfg, *, writable: bool = False) -> dict[str, Callable[[list[s
         from .web.settings import (
             ASSET_KINDS,
             SettingsError,
+            _number,
             read_assets,
             rename_asset,
             write_asset,
@@ -368,9 +369,10 @@ def build_commands(cfg, *, writable: bool = False) -> dict[str, Callable[[list[s
             for a in read_assets():
                 r = f" · {a['rate'] * 100:.2f}%" if a["rate"] else ""
                 out.append(f"{a['name']} · {a['kind']} · {_rupiah(a['value_idr'])}{r}")
-            out += ["", "/asset <name> <kind> <value> [rate%]",
+            out += ["", "/asset <name> <kind> <value> [rate%] [extra words ...]",
                     "/asset rename <old> <new>",
                     "/sell <name> [amount] — into cash",
+                    "(extra words after the value are kept as a note)",
                     "kinds: " + ", ".join(ASSET_KINDS)]
             return "\n".join(out)
         try:
@@ -381,9 +383,29 @@ def build_commands(cfg, *, writable: bool = False) -> dict[str, Callable[[list[s
                 return f"Renamed {r['was']} → {r['name']}"
             kind = args[1].lower() if len(args) > 1 and args[1].lower() in ASSET_KINDS else ""
             rest = args[2:] if kind else args[1:]
-            value = _amount(rest[0]) if rest else None
+            # People (and the agent itself) append prose after the numbers --
+            # "/asset Cash savings 21,4jt saldo Tahapan 5245046607". Scan for
+            # the value and rate instead of assuming fixed positions, and keep
+            # whatever is left as the note. A number past 100 cannot be a rate
+            # in this portfolio, so an account number never lands in rate.
+            value: float | None = None
+            rate: float | None = None
+            note_words: list[str] = []
+            for tok in rest:
+                is_pct = tok.endswith("%")
+                try:
+                    n = _number(tok)
+                except ValueError:
+                    note_words.append(tok)
+                    continue
+                if value is None and not is_pct:
+                    value = n
+                elif rate is None and (is_pct or 0 < n <= 100):
+                    rate = n
+                else:
+                    note_words.append(tok)
             r = write_asset(args[0], kind=kind, value=value,
-                            rate=rest[1] if len(rest) > 1 else None)
+                            rate=rate, note=" ".join(note_words))
         except (SettingsError, ValueError) as exc:
             return f"Could not save: {exc}"
         return f"{r['name']} {r['action']}. {r['assets']} asset(s) now."

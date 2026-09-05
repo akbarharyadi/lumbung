@@ -98,6 +98,11 @@ def _number(value: Any) -> float:
     The word boundary matters. Without it "1.2345" loses its decimal point and
     becomes twelve thousand, and an average price silently off by 1000x is the
     kind of error that only surfaces as a nonsensical P&L days later.
+
+    A trailing "%" is stripped, because rates are typed the way they are read
+    ("6.5%"). Anything that is not a number raises SettingsError with a message
+    meant for a person -- the raw float() text ("could not convert string to
+    float") reads like a stack trace, not an answer.
     """
     t = str(value).strip().lower().replace(" ", "")
     mult = 1
@@ -105,12 +110,17 @@ def _number(value: Any) -> float:
         mult, t = 1_000_000, t[:-2]
     elif t.endswith("rb"):
         mult, t = 1_000, t[:-2]
+    if t.endswith("%"):
+        t = t[:-1]
     cleaned = re.sub(r"[.,](?=\d{3}\b)", "", t)
     if mult > 1:
         # "1,5jt" and "1.5jt" both mean one and a half million: with a
         # multiplier attached the separator is a decimal point, not thousands.
         cleaned = cleaned.replace(",", ".")
-    return float(cleaned) * mult
+    try:
+        return float(cleaned) * mult
+    except ValueError:
+        raise SettingsError(f"could not read {value!r} as a number") from None
 
 
 class SettingsError(ValueError):

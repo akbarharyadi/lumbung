@@ -45,6 +45,18 @@ def test_number_does_not_eat_a_genuine_decimal():
     assert _number("1.2345") == pytest.approx(1.2345)
 
 
+def test_number_strips_a_trailing_percent_sign():
+    """Rates are typed the way they are read: "6.5%"."""
+    assert _number("6.5%") == pytest.approx(6.5)
+    assert _number("4%") == pytest.approx(4.0)
+
+
+def test_number_rejects_prose_with_a_readable_message():
+    """Not a float() traceback -- a sentence a person can act on."""
+    with pytest.raises(SettingsError, match="could not read 'saldo' as a number"):
+        _number("saldo")
+
+
 # -- holdings ----------------------------------------------------------------
 def test_add_a_holding(cfg):
     r = st.write_holding({"ticker": "BBRI", "lots": "20", "avg_price": "4520"})

@@ -122,6 +122,60 @@ def test_corrupt_lines_are_skipped(tmp_path):
     assert len(rows) == 1
 
 
+# -- /asset -------------------------------------------------------------------
+@pytest.fixture
+def _holdings(tmp_path, monkeypatch):
+    """Isolate the holdings file, the way the settings tests do."""
+    import shutil
+
+    import lumbung.web.settings as st
+    from lumbung.config import PROJECT_ROOT
+
+    dst = tmp_path / "holdings.yaml"
+    shutil.copy(PROJECT_ROOT / "config" / "holdings.yaml", dst)
+    monkeypatch.setattr(st, "_holdings_path", lambda: dst)
+    return st
+
+
+def test_asset_tolerates_prose_after_the_value(cfg, tmp_path, _holdings):
+    """The command that failed in the chat: trailing words are a note, not a
+    rate. Nothing about "saldo Tahapan 5245046607" should block the save."""
+    r = dispatch(cfg, "/asset Cash savings 21.4jt saldo Tahapan 5245046607",
+                 ask_queue=tmp_path / "q.jsonl")
+    assert "added" in r["reply"]
+    row = [a for a in _holdings.read_assets() if a["name"] == "Cash"][0]
+    assert row["value_idr"] == 21_400_000
+    assert row["rate"] == 0.0, "an account number must never land in rate"
+    assert "saldo Tahapan 5245046607" in row["note"]
+
+
+def test_asset_still_takes_a_plain_rate(cfg, tmp_path, _holdings):
+    r = dispatch(cfg, "/asset TestDep savings 15jt 6.5",
+                 ask_queue=tmp_path / "q.jsonl")
+    assert "added" in r["reply"]
+    row = [a for a in _holdings.read_assets() if a["name"] == "TestDep"][0]
+    assert row["value_idr"] == 15_000_000
+    assert row["rate"] == pytest.approx(0.065)
+
+
+def test_asset_pct_rate_updates_rate_without_touching_value(cfg, tmp_path, _holdings):
+    """A bare "4.25%" is a rate, never a Rp 4 revaluation."""
+    r = dispatch(cfg, "/asset Superbank savings 4.25%",
+                 ask_queue=tmp_path / "q.jsonl")
+    assert "updated" in r["reply"]
+    row = [a for a in _holdings.read_assets() if a["name"] == "Superbank"][0]
+    assert row["value_idr"] == 10_000_000
+    assert row["rate"] == pytest.approx(0.0425)
+
+
+def test_asset_prose_error_is_readable(cfg, tmp_path, _holdings):
+    """No numbers at all on a new asset: a sentence, not a traceback."""
+    r = dispatch(cfg, "/asset Cash savings saldo aja",
+                 ask_queue=tmp_path / "q.jsonl")
+    assert "Could not save" in r["reply"]
+    assert "float" not in r["reply"]
+
+
 # -- uploads -----------------------------------------------------------------
 def test_upload_accepts_an_image():
     c = TestClient(create_app(token=TOKEN, readonly=True))
